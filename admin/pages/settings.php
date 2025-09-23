@@ -46,7 +46,7 @@ function hr_sa_render_settings_page(): void
                                 <input type="url" class="regular-text" id="hr_sa_fallback_image" name="hr_sa_fallback_image" value="<?php echo esc_attr($fallback); ?>" placeholder="https://" />
                                 <button type="button" class="button hr-sa-media-picker" data-target="hr_sa_fallback_image"><?php esc_html_e('Choose Image', HR_SA_TEXT_DOMAIN); ?></button>
                             </div>
-                            <p class="description"><?php esc_html_e('Used when no hero image is provided. Must be an absolute HTTPS URL.', HR_SA_TEXT_DOMAIN); ?></p>
+                            <p class="description"><?php esc_html_e('Used when no header image meta is provided. Must be an absolute HTTPS URL.', HR_SA_TEXT_DOMAIN); ?></p>
                         </td>
                     </tr>
                     <tr>
@@ -80,7 +80,7 @@ function hr_sa_render_settings_page(): void
                                     <input type="checkbox" id="hr_sa_twitter_enabled" name="hr_sa_twitter_enabled" value="1" <?php checked($twitter_cards); ?> />
                                     <?php esc_html_e('Enable Twitter Card tags', HR_SA_TEXT_DOMAIN); ?>
                                 </label>
-                                <p class="description"><?php esc_html_e('Uses the hero image when available, falling back to the sitewide image.', HR_SA_TEXT_DOMAIN); ?></p>
+                                <p class="description"><?php esc_html_e('Uses the header image meta when available, falling back to the sitewide image.', HR_SA_TEXT_DOMAIN); ?></p>
                             </fieldset>
                         </td>
                     </tr>

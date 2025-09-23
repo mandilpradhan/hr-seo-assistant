@@ -1,6 +1,10 @@
 # ✅ HR SEO Assistant — Testing Checklist (Phase 1 + Image Meta Change)
 
-This checklist verifies that `og:image` and `twitter:image` correctly resolve from post meta `_hrih_header_image_url` with a fallback to the sitewide image.
+## Goal of Phase 1
+- Verify Open Graph and Twitter Card meta tags emit when enabled in settings.
+- Confirm header image meta → fallback image logic works for social previews.
+- Ensure Debug tooling surfaces OG/Twitter status and resolved fields.
+- Preserve JSON-LD parity from Phase 0.
 
 ---
 
@@ -23,23 +27,39 @@ This checklist verifies that `og:image` and `twitter:image` correctly resolve fr
 
 ---
 
-## 2. Page without `_hrih_header_image_url`
-- Open a Page with no `_hrih_header_image_url` saved.
-- View Source:
-  - `og:image` and `twitter:image` use sitewide fallback.
-  - Parameters match normalization.
-- Debug Page:
-  - `social_image_source = fallback`
-  - `social_image_url` matches fallback.
+## 2) Debug page validation
+Navigate to **HR SEO → Debug** (Debug toggle must be ON).
+
+Confirm sections:
+- **Environment:** Post ID / Type / Template, Current URL, Conflict Mode, Detected SEO plugins.
+- **Flags:** JSON-LD, Open Graph, Twitter Cards, Debug (all should read **On** except JSON-LD if manually disabled).
+- **Social Meta:** displays OG/Twitter enabled states, resolved title/description/url/site name/image, `social_image_source`, `social_image_url`, and JSON previews of tag arrays.
+- **Context:** `url, type, title, description, country, site_name, locale, twitter_handle, hero_url, fallback_image`.
+- **Connectors:** hero URL value (or “Not provided”).
+- **Settings snapshot:** reflects saved settings.
+
+Use the “Copy Context & Settings JSON” button to ensure payload includes the new flags.
 
 ---
 
-## 3. Invalid or Empty Meta
-- Set `_hrih_header_image_url` to empty or invalid value.
-- View Source:
-  - `og:image` falls back to sitewide fallback.
-- Debug Page:
-  - `social_image_source = fallback`
+## 3) Front-end OG/Twitter emission
+1. Load a **Trip** detail page on the front-end and view source.
+   - Confirm a single block of `<meta property="og:*">` tags emitted by HR SEO Assistant.
+   - Verify `og:type` is `trip`, title matches the template, and image points to the header image meta (or fallback when meta is missing).
+   - Confirm matching `twitter:*` tags exist with `twitter:card` = `summary_large_image`.
+2. Load a **Generic Page** (e.g., About).
+   - `og:type` should be `article`.
+   - Title/description pulled from page content/excerpt per template.
+3. Load the **Homepage**.
+   - `og:type` should be `website`.
+   - Description should fall back to the site tagline when no explicit excerpt exists.
+
+---
+
+## 4) Image fallback logic
+1. On a Trip with the `_hrih_header_image_url` meta populated, ensure `og:image` and `twitter:image` use that URL (with the CDN preset applied).
+2. On a Page without the `_hrih_header_image_url` meta, confirm `og:image` and `twitter:image` fall back to the sitewide image.
+3. If both the meta value and fallback image are missing, confirm no social image tag is output and the debug page reports “No social image resolved”.
 
 ---
 

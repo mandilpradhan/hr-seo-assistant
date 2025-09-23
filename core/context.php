@@ -303,3 +303,169 @@ function hr_sa_context_normalize_description(string $value, int $max_chars = 280
 
     return $slice . '…';
 }
+
+/**
+ * Apply the configured CDN preset to an image URL.
+ *
+ * @param string $url Base image URL.
+ *
+ * @return string
+ */
+function hr_sa_apply_image_preset(string $url): string
+{
+    $preset = trim((string) hr_sa_get_image_preset());
+    if ($preset === '') {
+        return $url;
+    }
+
+    $parts = array_filter(array_map('trim', explode(',', $preset)));
+    if (!$parts) {
+        return $url;
+    }
+
+    $args = [];
+    foreach ($parts as $part) {
+        if (strpos($part, '=') === false) {
+            continue;
+        }
+
+        [$key, $value] = array_map('trim', explode('=', $part, 2));
+        if ($key === '') {
+            continue;
+        }
+
+        $args[$key] = $value;
+    }
+
+    if ($args === []) {
+        return $url;
+    }
+
+    return add_query_arg($args, $url);
+}
+
+/**
+ * Normalize a candidate social image URL.
+ *
+ * @param mixed $value Raw candidate value.
+ */
+function hr_sa_normalize_social_image_candidate($value): ?string
+{
+    if (!is_string($value)) {
+        return null;
+    }
+
+    $value = trim($value);
+    if ($value === '') {
+        return null;
+    }
+
+    $url = esc_url_raw($value);
+    if ($url === '' || !wp_http_validate_url($url)) {
+        return null;
+    }
+
+    $parts = wp_parse_url($url);
+    if (!$parts || empty($parts['scheme']) || empty($parts['host']) || strtolower((string) $parts['scheme']) !== 'https') {
+        return null;
+    }
+
+    $url = hr_sa_apply_image_preset($url);
+    $url = esc_url_raw($url);
+    if ($url === '' || !wp_http_validate_url($url)) {
+        return null;
+    }
+
+    $parts = wp_parse_url($url);
+    if (!$parts || empty($parts['scheme']) || empty($parts['host']) || strtolower((string) $parts['scheme']) !== 'https') {
+        return null;
+    }
+
+    return $url;
+}
+
+/**
+ * Resolve the social image URL and data for a given post.
+ *
+ * @return array{url: ?string, source: ?string}
+ */
+function hr_sa_get_social_image_resolution(int $post_id): array
+{
+    $url    = null;
+    $source = null;
+
+    if ($post_id > 0) {
+        $meta_value = get_post_meta($post_id, '_hrih_header_image_url', true);
+        $normalized = hr_sa_normalize_social_image_candidate($meta_value);
+        if ($normalized !== null) {
+            $url    = $normalized;
+            $source = 'meta';
+        }
+    }
+
+    if ($url === null) {
+        $fallback = hr_sa_context_prepare_fallback_image();
+        $fallback = (string) apply_filters('hr_mh_site_fallback_image', $fallback);
+        $normalized = hr_sa_normalize_social_image_candidate($fallback);
+        if ($normalized !== null) {
+            $url    = $normalized;
+            $source = 'fallback';
+        }
+    }
+
+    if ($url !== null) {
+        /**
+         * Filter the resolved social image URL prior to output.
+         *
+         * @param string $url    Social image URL after normalization.
+         * @param array{post_id: int, source: ?string} $data Additional context about the resolution.
+         */
+        $filtered = apply_filters('hr_sa_social_image_url', $url, [
+            'post_id' => $post_id,
+            'source'  => $source,
+        ]);
+
+        if (is_string($filtered) && $filtered !== '') {
+            $filtered = esc_url_raw($filtered);
+            if ($filtered !== '' && wp_http_validate_url($filtered)) {
+                $parts = wp_parse_url($filtered);
+                if ($parts && !empty($parts['scheme']) && !empty($parts['host']) && strtolower((string) $parts['scheme']) === 'https') {
+                    $url = $filtered;
+                } else {
+                    $url    = null;
+                    $source = null;
+                }
+            } else {
+                $url    = null;
+                $source = null;
+            }
+        } elseif ($filtered === '') {
+            $url    = null;
+            $source = null;
+        }
+    }
+
+    if ($url === null) {
+        return [
+            'url'    => null,
+            'source' => null,
+        ];
+    }
+
+    return [
+        'url'    => $url,
+        'source' => $source,
+    ];
+}
+
+/**
+ * Resolve the final social image URL for a given post.
+ *
+ * @return string|null
+ */
+function hr_sa_resolve_social_image_url(int $post_id): ?string
+{
+    $resolution = hr_sa_get_social_image_resolution($post_id);
+
+    return $resolution['url'];
+}
