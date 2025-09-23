@@ -38,11 +38,13 @@ function hr_sa_render_debug_page(): void
         'twitter' => $twitter_on,
         'debug'   => hr_sa_is_debug_enabled(),
     ];
-    $hero_url     = hr_sa_get_media_help_hero_url();
-    $has_hero     = $hero_url !== null;
-    $social_image = function_exists('hr_sa_resolve_social_image_url') ? hr_sa_resolve_social_image_url($context) : null;
-    $og_tags      = $og_enabled && function_exists('hr_sa_build_og_tags') ? hr_sa_build_og_tags($context, $social_image) : [];
-    $twitter_tags = $twitter_on && function_exists('hr_sa_build_twitter_tags') ? hr_sa_build_twitter_tags($context, $social_image) : [];
+    $hero_url            = hr_sa_get_media_help_hero_url();
+    $has_hero            = $hero_url !== null;
+    $image_resolution    = hr_sa_get_social_image_resolution($post_id);
+    $social_image_url    = $image_resolution['url'];
+    $social_image_source = $image_resolution['source'];
+    $og_tags             = $og_enabled && function_exists('hr_sa_build_og_tags') ? hr_sa_build_og_tags($context, $social_image_url) : [];
+    $twitter_tags        = $twitter_on && function_exists('hr_sa_build_twitter_tags') ? hr_sa_build_twitter_tags($context, $social_image_url) : [];
     $og_type      = function_exists('hr_sa_resolve_og_type') ? hr_sa_resolve_og_type($context) : ($context['type'] ?? 'page');
     $other_seo    = hr_sa_other_seo_active();
     $emitters     = function_exists('hr_sa_jsonld_get_active_emitters') ? hr_sa_jsonld_get_active_emitters() : [];
@@ -132,12 +134,22 @@ function hr_sa_render_debug_page(): void
                         <td><?php echo esc_html($context['site_name']); ?></td>
                     </tr>
                     <tr>
-                        <th scope="row"><?php esc_html_e('Resolved Image', HR_SA_TEXT_DOMAIN); ?></th>
+                        <th scope="row"><?php esc_html_e('Social Image Source', HR_SA_TEXT_DOMAIN); ?></th>
                         <td>
-                            <?php if ($social_image) : ?>
-                                <code><?php echo esc_html($social_image); ?></code>
+                            <?php if ($social_image_source) : ?>
+                                <code><?php echo esc_html((string) $social_image_source); ?></code>
                             <?php else : ?>
-                                <span class="description"><?php esc_html_e('No image resolved (hero and fallback empty).', HR_SA_TEXT_DOMAIN); ?></span>
+                                <span class="description"><?php esc_html_e('No social image resolved.', HR_SA_TEXT_DOMAIN); ?></span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Social Image URL', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td>
+                            <?php if ($social_image_url) : ?>
+                                <code><?php echo esc_html($social_image_url); ?></code>
+                            <?php else : ?>
+                                <span class="description"><?php esc_html_e('No image resolved (meta and fallback empty).', HR_SA_TEXT_DOMAIN); ?></span>
                             <?php endif; ?>
                         </td>
                     </tr>

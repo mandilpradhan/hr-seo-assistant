@@ -56,10 +56,11 @@ function hr_sa_render_social_meta(): void
 
     $printed = true;
 
-    $context       = hr_sa_get_context();
-    $image_url     = hr_sa_resolve_social_image_url($context);
-    $og_tags       = hr_sa_is_og_enabled() ? hr_sa_build_og_tags($context, $image_url) : [];
-    $twitter_tags  = hr_sa_is_twitter_enabled() ? hr_sa_build_twitter_tags($context, $image_url) : [];
+    $context      = hr_sa_get_context();
+    $post_id      = is_singular() ? get_queried_object_id() : 0;
+    $image_url    = hr_sa_resolve_social_image_url($post_id);
+    $og_tags      = hr_sa_is_og_enabled() ? hr_sa_build_og_tags($context, $image_url) : [];
+    $twitter_tags = hr_sa_is_twitter_enabled() ? hr_sa_build_twitter_tags($context, $image_url) : [];
 
     if (!$og_tags && !$twitter_tags) {
         return;
@@ -150,33 +151,6 @@ function hr_sa_build_twitter_tags(array $context, ?string $image_url = null): ar
      * @param array<string, mixed>  $context Current SEO context.
      */
     return (array) apply_filters('hr_sa_twitter_tags', $tags, $context);
-}
-
-/**
- * Resolve a social image URL using hero → fallback order.
- *
- * @param array<string, mixed> $context
- */
-function hr_sa_resolve_social_image_url(array $context): ?string
-{
-    $hero = isset($context['hero_url']) ? (string) $context['hero_url'] : '';
-    if ($hero !== '') {
-        $hero = esc_url_raw($hero);
-        if ($hero !== '') {
-            return $hero;
-        }
-    }
-
-    $fallback = isset($context['fallback_image']) ? (string) $context['fallback_image'] : '';
-    $fallback = (string) apply_filters('hr_mh_site_fallback_image', $fallback);
-    if ($fallback !== '') {
-        $fallback = esc_url_raw($fallback);
-        if ($fallback !== '') {
-            return $fallback;
-        }
-    }
-
-    return null;
 }
 
 /**
