@@ -27,6 +27,8 @@ function hr_sa_render_settings_page(): void
     $locale        = (string) hr_sa_get_setting('hr_sa_locale');
     $site_name     = (string) hr_sa_get_setting('hr_sa_site_name', get_bloginfo('name'));
     $twitter       = (string) hr_sa_get_setting('hr_sa_twitter_handle');
+    $og_enabled    = (bool) hr_sa_get_setting('hr_sa_og_enabled');
+    $twitter_cards = (bool) hr_sa_get_setting('hr_sa_twitter_enabled');
     $image_preset  = (string) get_option('hr_sa_image_preset', hr_sa_get_settings_defaults()['hr_sa_image_preset']);
     $conflict_mode = hr_sa_get_conflict_mode();
     $debug_enabled = hr_sa_is_debug_enabled();
@@ -61,6 +63,24 @@ function hr_sa_render_settings_page(): void
                                     <input type="checkbox" id="hr_sa_tpl_page_brand_suffix" name="hr_sa_tpl_page_brand_suffix" value="1" <?php checked($brand_suffix); ?> />
                                     <?php esc_html_e('Append brand suffix', HR_SA_TEXT_DOMAIN); ?>
                                 </label>
+                            </fieldset>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Social Meta Output', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td>
+                            <fieldset>
+                                <legend class="screen-reader-text"><?php esc_html_e('Social Meta Output', HR_SA_TEXT_DOMAIN); ?></legend>
+                                <label for="hr_sa_og_enabled">
+                                    <input type="checkbox" id="hr_sa_og_enabled" name="hr_sa_og_enabled" value="1" <?php checked($og_enabled); ?> />
+                                    <?php esc_html_e('Enable Open Graph tags', HR_SA_TEXT_DOMAIN); ?>
+                                </label>
+                                <br />
+                                <label for="hr_sa_twitter_enabled">
+                                    <input type="checkbox" id="hr_sa_twitter_enabled" name="hr_sa_twitter_enabled" value="1" <?php checked($twitter_cards); ?> />
+                                    <?php esc_html_e('Enable Twitter Card tags', HR_SA_TEXT_DOMAIN); ?>
+                                </label>
+                                <p class="description"><?php esc_html_e('Uses the hero image when available, falling back to the sitewide image.', HR_SA_TEXT_DOMAIN); ?></p>
                             </fieldset>
                         </td>
                     </tr>

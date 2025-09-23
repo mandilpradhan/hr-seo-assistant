@@ -27,6 +27,8 @@ function hr_sa_get_settings_defaults(): array
         'hr_sa_locale'                   => 'en_US',
         'hr_sa_site_name'                => get_bloginfo('name'),
         'hr_sa_twitter_handle'           => '@himalayanrides',
+        'hr_sa_og_enabled'               => '1',
+        'hr_sa_twitter_enabled'          => '1',
         'hr_sa_image_preset'             => 'w=1200,fit=cover,gravity=auto,format=auto,quality=75',
         'hr_sa_conflict_mode'            => 'respect',
         'hr_sa_debug_enabled'            => '0',
@@ -92,6 +94,18 @@ function hr_sa_register_settings(): void
         'type'              => 'string',
         'sanitize_callback' => 'hr_sa_sanitize_twitter_handle',
         'default'           => hr_sa_get_settings_defaults()['hr_sa_twitter_handle'],
+    ]);
+
+    register_setting('hr_sa_settings', 'hr_sa_og_enabled', [
+        'type'              => 'boolean',
+        'sanitize_callback' => 'hr_sa_sanitize_checkbox',
+        'default'           => hr_sa_get_settings_defaults()['hr_sa_og_enabled'],
+    ]);
+
+    register_setting('hr_sa_settings', 'hr_sa_twitter_enabled', [
+        'type'              => 'boolean',
+        'sanitize_callback' => 'hr_sa_sanitize_checkbox',
+        'default'           => hr_sa_get_settings_defaults()['hr_sa_twitter_enabled'],
     ]);
 
     register_setting('hr_sa_settings', 'hr_sa_image_preset', [
@@ -228,7 +242,7 @@ function hr_sa_get_setting(string $option, $default = null)
     $default = $default ?? ($defaults[$option] ?? '');
     $value = get_option($option, $default);
 
-    if (in_array($option, ['hr_sa_tpl_page_brand_suffix', 'hr_sa_debug_enabled'], true)) {
+    if (in_array($option, ['hr_sa_tpl_page_brand_suffix', 'hr_sa_debug_enabled', 'hr_sa_og_enabled', 'hr_sa_twitter_enabled'], true)) {
         return $value === '1' || $value === 1 || $value === true;
     }
 
@@ -249,6 +263,8 @@ function hr_sa_get_all_settings(): array
 
     $settings['hr_sa_tpl_page_brand_suffix'] = hr_sa_get_setting('hr_sa_tpl_page_brand_suffix');
     $settings['hr_sa_debug_enabled'] = hr_sa_get_setting('hr_sa_debug_enabled');
+    $settings['hr_sa_og_enabled'] = hr_sa_get_setting('hr_sa_og_enabled');
+    $settings['hr_sa_twitter_enabled'] = hr_sa_get_setting('hr_sa_twitter_enabled');
 
     return $settings;
 }

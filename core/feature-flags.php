@@ -17,10 +17,11 @@ if (!defined('ABSPATH')) {
 function hr_sa_feature_flags_initialize_defaults(): void
 {
     $defaults = [
-        'hr_sa_jsonld_enabled'      => '1',
-        'hr_sa_og_enabled'          => '0',
-        'hr_sa_debug_enabled'       => hr_sa_get_settings_defaults()['hr_sa_debug_enabled'],
-        'hr_sa_respect_other_seo'   => '1',
+        'hr_sa_jsonld_enabled'    => '1',
+        'hr_sa_og_enabled'        => hr_sa_get_settings_defaults()['hr_sa_og_enabled'],
+        'hr_sa_twitter_enabled'   => hr_sa_get_settings_defaults()['hr_sa_twitter_enabled'],
+        'hr_sa_debug_enabled'     => hr_sa_get_settings_defaults()['hr_sa_debug_enabled'],
+        'hr_sa_respect_other_seo' => '1',
     ];
 
     foreach ($defaults as $option => $value) {
@@ -53,8 +54,15 @@ function hr_sa_is_jsonld_enabled(): bool
  */
 function hr_sa_is_og_enabled(): bool
 {
-    $enabled = hr_sa_is_flag_enabled('hr_sa_og_enabled', false);
-    return (bool) apply_filters('hr_sa_og_enabled', $enabled);
+    $enabled = hr_sa_is_flag_enabled('hr_sa_og_enabled', true);
+    $enabled = (bool) apply_filters('hr_sa_og_enabled', $enabled);
+
+    /**
+     * Filter whether OG tags are enabled.
+     *
+     * @param bool $enabled Whether OG tags should be emitted.
+     */
+    return (bool) apply_filters('hr_sa_enable_og', $enabled);
 }
 
 /**
@@ -66,6 +74,22 @@ function hr_sa_is_debug_enabled(): bool
     $enabled = is_bool($option) ? $option : hr_sa_is_flag_enabled('hr_sa_debug_enabled', false);
 
     return (bool) apply_filters('hr_sa_debug_enabled', $enabled);
+}
+
+/**
+ * Whether Twitter Card emission is enabled.
+ */
+function hr_sa_is_twitter_enabled(): bool
+{
+    $enabled = hr_sa_is_flag_enabled('hr_sa_twitter_enabled', true);
+    $enabled = (bool) apply_filters('hr_sa_twitter_enabled', $enabled);
+
+    /**
+     * Filter whether Twitter tags are enabled.
+     *
+     * @param bool $enabled Whether Twitter tags should be emitted.
+     */
+    return (bool) apply_filters('hr_sa_enable_twitter', $enabled);
 }
 
 /**
