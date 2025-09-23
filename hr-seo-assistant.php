@@ -24,4 +24,3 @@ add_action('admin_menu', function () {
         58
     );
 });
-PHP
