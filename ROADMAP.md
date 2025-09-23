@@ -122,3 +122,22 @@ To provide a single, lightweight SEO assistant plugin that:
 - **1.0.0** Stable: JSON-LD + OG parity, debug, settings
 - **1.x.x** Incremental refinements
 - **2.0.0** Major: AI assist rollout
+
+---
+
+## Naming Scheme (filters/actions & modules)
+
+**Prefixes**
+- `hr_sa_*` → HR SEO Assistant (this plugin)
+- `hr_mh_*` → HR Media Help (hero connector)
+- `hr_tk_*` → HR Toolkit (reserved)
+
+**Canonical hooks**
+- `hr_sa_get_context` (filter) → final SEO context array
+- `hr_sa_image_preset` (filter) → CDN preset string (default: w=1200,fit=cover,gravity=auto,format=auto,quality=75)
+- `hr_sa_conflict_mode` (filter) → 'respect' | 'force'
+- `hr_sa_debug_enabled` (filter) → bool
+- `hr_mh_current_hero_url` (filter) → base hero URL (or null)
+- `hr_mh_site_fallback_image` (filter) → fallback social image URL
+
+Reason: unambiguous debugging across baskets; prefixes must be used in all new hooks.
