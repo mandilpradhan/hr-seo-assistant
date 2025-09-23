@@ -68,74 +68,60 @@ curl -s "$URL" | perl -0777 -ne 'print "$1\n" while (/\<script type="application
 
 URL="https://himalayanrides.com/"
 curl -s "$URL" | perl -0777 -ne 'print "$1\n" while (/\<script type="application\/ld\+json"\>(.*?)\<\/script\>/sg)' > /tmp/legacy-home.json
+```
 
-# ...repeat for a generic page
+> Note: Some pages output **multiple** JSON-LD blocks. Saving the concatenation is fine—we’ll compare normalized JSON, not formatting.
 
+---
 
+## 5) Switch to plugin JSON-LD (temporarily disable legacy)
+**Because MU-plugins always load**, do ONE of these on staging:
 
-Note: Some pages output multiple JSON-LD blocks. Saving the concatenation is fine—we’ll compare normalized JSON, not formatting.
+- Easiest: **Temporarily rename** each relevant MU file in `/wp-content/mu-plugins/` from `*.php` → `*.ph_` (so WP won’t load it).  
+  Example:
+  ```bash
+  cd /path/to/wp-content/mu-plugins
+  mv hr-schema-core.php hr-schema-core.ph_
+  mv hr-trip-schema-graph.php hr-trip-schema-graph.ph_
+  mv hr-wte-vehicle-offers.php hr-wte-vehicle-offers.ph_
+  ```
 
-5) Switch to plugin JSON-LD (temporarily disable legacy)
+- OR move them into a `disabled-mu/` folder temporarily.
 
-Because MU-plugins always load, do ONE of these on staging:
+Ensure HR SEO Assistant’s JSON-LD module is **enabled** (it should be by default in Phase 0).
 
-Easiest: Temporarily rename each relevant MU file in /wp-content/mu-plugins/ from *.php → *.ph_ (so WP won’t load it).
-Example:
+---
 
-cd /path/to/wp-content/mu-plugins
-mv hr-schema-core.php hr-schema-core.ph_
-mv hr-trip-schema-graph.php hr-trip-schema-graph.ph_
-mv hr-wte-vehicle-offers.php hr-wte-vehicle-offers.ph_
-
-
-OR move them into a disabled-mu/ folder temporarily.
-
-Ensure HR SEO Assistant’s JSON-LD module is enabled (it should be by default in Phase 0).
-
-6) JSON-LD parity — capture plugin output
-
+## 6) JSON-LD parity — capture plugin output
 Use the same URLs as step 4:
-
+```bash
 URL="https://himalayanrides.com/trip/bhutan-motorcycle-tour-chasing-the-thunder-dragon/"
 curl -s "$URL" | perl -0777 -ne 'print "$1\n" while (/\<script type="application\/ld\+json"\>(.*?)\<\/script\>/sg)' > /tmp/plugin-trip.json
+```
 
-URL="https://himalayanrides.com/"
-curl -s "$URL" | perl -0777 -ne 'print "$1\n" while (/\<script type="application\/ld\+json"\>(.*?)\<\/script\>/sg)' > /tmp/plugin-home.json
+---
 
-7) Compare outputs (normalized)
-
-If jq is available:
-
+## 7) Compare outputs (normalized)
+If `jq` is available:
+```bash
 jq -S . /tmp/legacy-trip.json  >/tmp/legacy-trip.norm.json 2>/dev/null || cp /tmp/legacy-trip.json  /tmp/legacy-trip.norm.json
 jq -S . /tmp/plugin-trip.json  >/tmp/plugin-trip.norm.json 2>/dev/null || cp /tmp/plugin-trip.json  /tmp/plugin-trip.norm.json
 diff -u /tmp/legacy-trip.norm.json /tmp/plugin-trip.norm.json || echo "Trip JSON-LD: differences shown above"
+```
 
-# Repeat for home & generic page
+---
 
+## 8) Restore legacy MUs (until Phase 1)
+Rename MU files back to `*.php` so production behavior is unchanged until we ship OG in Phase 1.
 
-You’re looking for semantic parity. Minor whitespace/order differences are OK; structure, fields, and values should match.
+---
 
-8) Restore legacy MUs (until Phase 1)
+## 9) Final checks
+- **HR SEO Assistant** remains active.
+- **Debug** page shows JSON-LD module enabled, OG disabled.
+- No PHP notices/fatals in error logs during page loads.
 
-Rename MU files back to *.php so production behavior is unchanged until we ship OG in Phase 1:
-
-cd /path/to/wp-content/mu-plugins
-mv hr-schema-core.ph_ hr-schema-core.php
-mv hr-trip-schema-graph.ph_ hr-trip-schema-graph.php
-mv hr-wte-vehicle-offers.ph_ hr-wte-vehicle-offers.php
-
-9) Final checks
-
-HR SEO Assistant remains active.
-
-Debug page shows JSON-LD module enabled, OG disabled.
-
-No PHP notices/fatals in error logs during page loads.
-
-✅ Phase 0 is complete when:
-
-JSON-LD parity is verified on the three page types.
-
-Admin UI & Debug behave correctly.
-
-No OG/Twitter emitted by our plugin yet.
+✅ **Phase 0 is complete** when:
+- JSON-LD parity is verified on the three page types.
+- Admin UI & Debug behave correctly.
+- No OG/Twitter emitted by our plugin yet.
