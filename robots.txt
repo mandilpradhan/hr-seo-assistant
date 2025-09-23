@@ -1,0 +1,21 @@
+# HR SEO Assistant - Robots Instructions
+# Generated baseline for himalayanrides.com
+# Version: 0.1.0
+
+# Block sensitive admin/system areas
+User-agent: *
+Disallow: /wp-admin/
+Disallow: /wp-includes/
+Disallow: /wp-content/plugins/
+Disallow: /wp-content/mu-plugins/
+Disallow: /cgi-bin/
+Disallow: /xmlrpc.php
+
+# Allow essential admin AJAX
+Allow: /wp-admin/admin-ajax.php
+
+# Crawl-delay safeguard (optional - uncomment if needed)
+# Crawl-delay: 10
+
+# Sitemaps (to be generated or managed separately)
+Sitemap: https://himalayanrides.com/sitemap.xml
