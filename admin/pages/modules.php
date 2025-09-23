@@ -28,7 +28,7 @@ function hr_sa_render_modules_page(): void
         ],
         [
             'name'        => __('OG/Twitter Module', HR_SA_TEXT_DOMAIN),
-            'description' => __('Open Graph and Twitter Cards (planned for Phase 1).', HR_SA_TEXT_DOMAIN),
+            'description' => __('Open Graph and Twitter Cards with hero → fallback image logic.', HR_SA_TEXT_DOMAIN),
             'enabled'     => hr_sa_is_og_enabled(),
         ],
         [
@@ -40,7 +40,7 @@ function hr_sa_render_modules_page(): void
     ?>
     <div class="wrap hr-sa-wrap">
         <h1><?php esc_html_e('HR SEO Modules', HR_SA_TEXT_DOMAIN); ?></h1>
-        <p class="description"><?php esc_html_e('Module toggles are read-only in Phase 0. Future phases will allow enabling/disabling from here.', HR_SA_TEXT_DOMAIN); ?></p>
+        <p class="description"><?php esc_html_e('Manage module toggles from the Settings screen. This table reflects the current state.', HR_SA_TEXT_DOMAIN); ?></p>
         <table class="widefat fixed striped">
             <thead>
                 <tr>

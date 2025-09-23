@@ -30,13 +30,20 @@ function hr_sa_render_debug_page(): void
     $context      = hr_sa_get_context();
     $settings     = hr_sa_get_all_settings();
     $conflict     = hr_sa_get_conflict_mode();
+    $og_enabled   = hr_sa_is_og_enabled();
+    $twitter_on   = hr_sa_is_twitter_enabled();
     $flags        = [
-        'jsonld' => hr_sa_is_jsonld_enabled(),
-        'og'     => hr_sa_is_og_enabled(),
-        'debug'  => hr_sa_is_debug_enabled(),
+        'jsonld'  => hr_sa_is_jsonld_enabled(),
+        'og'      => $og_enabled,
+        'twitter' => $twitter_on,
+        'debug'   => hr_sa_is_debug_enabled(),
     ];
     $hero_url     = hr_sa_get_media_help_hero_url();
     $has_hero     = $hero_url !== null;
+    $social_image = function_exists('hr_sa_resolve_social_image_url') ? hr_sa_resolve_social_image_url($context) : null;
+    $og_tags      = $og_enabled && function_exists('hr_sa_build_og_tags') ? hr_sa_build_og_tags($context, $social_image) : [];
+    $twitter_tags = $twitter_on && function_exists('hr_sa_build_twitter_tags') ? hr_sa_build_twitter_tags($context, $social_image) : [];
+    $og_type      = function_exists('hr_sa_resolve_og_type') ? hr_sa_resolve_og_type($context) : ($context['type'] ?? 'page');
     $other_seo    = hr_sa_other_seo_active();
     $emitters     = function_exists('hr_sa_jsonld_get_active_emitters') ? hr_sa_jsonld_get_active_emitters() : [];
     $copy_payload = [
@@ -82,11 +89,70 @@ function hr_sa_render_debug_page(): void
                         <td>
                             <ul>
                                 <li><?php esc_html_e('JSON-LD', HR_SA_TEXT_DOMAIN); ?>: <?php echo $flags['jsonld'] ? esc_html__('On', HR_SA_TEXT_DOMAIN) : esc_html__('Off', HR_SA_TEXT_DOMAIN); ?></li>
-                                <li><?php esc_html_e('OG/Twitter', HR_SA_TEXT_DOMAIN); ?>: <?php echo $flags['og'] ? esc_html__('On', HR_SA_TEXT_DOMAIN) : esc_html__('Off', HR_SA_TEXT_DOMAIN); ?></li>
+                                <li><?php esc_html_e('Open Graph', HR_SA_TEXT_DOMAIN); ?>: <?php echo $flags['og'] ? esc_html__('On', HR_SA_TEXT_DOMAIN) : esc_html__('Off', HR_SA_TEXT_DOMAIN); ?></li>
+                                <li><?php esc_html_e('Twitter Cards', HR_SA_TEXT_DOMAIN); ?>: <?php echo $flags['twitter'] ? esc_html__('On', HR_SA_TEXT_DOMAIN) : esc_html__('Off', HR_SA_TEXT_DOMAIN); ?></li>
                                 <li><?php esc_html_e('Debug', HR_SA_TEXT_DOMAIN); ?>: <?php echo $flags['debug'] ? esc_html__('On', HR_SA_TEXT_DOMAIN) : esc_html__('Off', HR_SA_TEXT_DOMAIN); ?></li>
                             </ul>
                         </td>
                     </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="hr-sa-section">
+            <h2><?php esc_html_e('Social Meta', HR_SA_TEXT_DOMAIN); ?></h2>
+            <table class="widefat striped">
+                <tbody>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Open Graph Enabled', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td><?php echo $og_enabled ? esc_html__('Yes', HR_SA_TEXT_DOMAIN) : esc_html__('No', HR_SA_TEXT_DOMAIN); ?></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Twitter Cards Enabled', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td><?php echo $twitter_on ? esc_html__('Yes', HR_SA_TEXT_DOMAIN) : esc_html__('No', HR_SA_TEXT_DOMAIN); ?></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('OG Type', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td><?php echo esc_html((string) $og_type); ?></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Resolved Title', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td><?php echo esc_html($context['title']); ?></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Resolved Description', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td><?php echo esc_html($context['description']); ?></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Resolved URL', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td><code><?php echo esc_html($context['url']); ?></code></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Resolved Site Name', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td><?php echo esc_html($context['site_name']); ?></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Resolved Image', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td>
+                            <?php if ($social_image) : ?>
+                                <code><?php echo esc_html($social_image); ?></code>
+                            <?php else : ?>
+                                <span class="description"><?php esc_html_e('No image resolved (hero and fallback empty).', HR_SA_TEXT_DOMAIN); ?></span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php if ($og_tags) : ?>
+                        <tr>
+                            <th scope="row"><?php esc_html_e('OG Tag Preview', HR_SA_TEXT_DOMAIN); ?></th>
+                            <td><code><?php echo esc_html(wp_json_encode($og_tags, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)); ?></code></td>
+                        </tr>
+                    <?php endif; ?>
+                    <?php if ($twitter_tags) : ?>
+                        <tr>
+                            <th scope="row"><?php esc_html_e('Twitter Tag Preview', HR_SA_TEXT_DOMAIN); ?></th>
+                            <td><code><?php echo esc_html(wp_json_encode($twitter_tags, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)); ?></code></td>
+                        </tr>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </section>
