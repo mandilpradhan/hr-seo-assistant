@@ -314,7 +314,7 @@ function hr_sa_resolve_context_image_url(?int $post_id): ?string
             continue;
         }
 
-        $transformed = hr_sa_apply_image_preset_to_url($sanitized);
+        $transformed = hr_sa_apply_image_url_replacements($sanitized);
         if ($transformed !== '') {
             $resolved = $transformed;
             break;
@@ -356,74 +356,82 @@ function hr_sa_sanitize_context_image_url(string $url): ?string
 }
 
 /**
- * Apply the configured CDN preset to an image URL.
+ * Determine whether the image URL replacement feature is enabled.
  */
-function hr_sa_apply_image_preset_to_url(string $url): string
+function hr_sa_is_image_url_replacement_enabled(): bool
 {
-    $preset = trim((string) hr_sa_get_image_preset());
-    if ($preset === '') {
-        return $url;
-    }
+    $enabled = (bool) hr_sa_get_setting('hr_sa_image_url_replace_enabled');
 
-    $parts = wp_parse_url($url);
-    if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
-        return $url;
-    }
-
-    $query_args = [];
-    if (!empty($parts['query'])) {
-        parse_str((string) $parts['query'], $query_args);
-    }
-
-    foreach (explode(',', $preset) as $segment) {
-        $segment = trim($segment);
-        if ($segment === '' || strpos($segment, '=') === false) {
-            continue;
-        }
-
-        [$key, $value] = array_map('trim', explode('=', $segment, 2));
-        if ($key === '') {
-            continue;
-        }
-
-        $query_args[$key] = $value;
-    }
-
-    $parts['query'] = $query_args ? http_build_query($query_args, '', '&', PHP_QUERY_RFC3986) : '';
-
-    $rebuilt = hr_sa_build_url_from_parts($parts);
-
-    return $rebuilt !== '' ? $rebuilt : $url;
+    /**
+     * Filter whether image URL replacement should run.
+     *
+     * @param bool $enabled
+     */
+    return (bool) apply_filters('hr_sa_image_url_replace_enabled', $enabled);
 }
 
 /**
- * Reconstruct a URL from its parsed components.
+ * Retrieve the configured prefix/suffix replacement rules.
  *
- * @param array<string, mixed> $parts
+ * @return array{prefix_find: string, prefix_replace: string, suffix_find: string, suffix_replace: string}
  */
-function hr_sa_build_url_from_parts(array $parts): string
+function hr_sa_get_image_url_replacement_rules(): array
 {
-    $scheme = isset($parts['scheme']) ? $parts['scheme'] . '://' : '';
-    $host   = $parts['host'] ?? '';
-    if ($host === '') {
-        return '';
+    $rules = [
+        'prefix_find'    => (string) hr_sa_get_setting('hr_sa_image_url_prefix_find', ''),
+        'prefix_replace' => (string) hr_sa_get_setting('hr_sa_image_url_prefix_replace', ''),
+        'suffix_find'    => (string) hr_sa_get_setting('hr_sa_image_url_suffix_find', ''),
+        'suffix_replace' => (string) hr_sa_get_setting('hr_sa_image_url_suffix_replace', ''),
+    ];
+
+    /**
+     * Filter the image URL replacement rules.
+     *
+     * @param array<string, string> $rules
+     */
+    return apply_filters('hr_sa_image_url_replacement_rules', $rules);
+}
+
+/**
+ * Apply configured prefix and suffix replacements to an image URL.
+ */
+function hr_sa_apply_image_url_replacements(string $url): string
+{
+    if ($url === '' || !hr_sa_is_image_url_replacement_enabled()) {
+        return $url;
     }
 
-    $user = $parts['user'] ?? '';
-    $pass = $parts['pass'] ?? null;
-    $auth = '';
-    if ($user !== '') {
-        $auth = $user;
-        if ($pass !== null) {
-            $auth .= ':' . $pass;
+    $rules    = hr_sa_get_image_url_replacement_rules();
+    $original = $url;
+    $updated  = $url;
+
+    if ($rules['prefix_find'] !== '') {
+        $prefix_length = strlen($rules['prefix_find']);
+        if ($prefix_length > 0 && strpos($updated, $rules['prefix_find']) === 0) {
+            $updated = $rules['prefix_replace'] . substr($updated, $prefix_length);
         }
-        $auth .= '@';
     }
 
-    $port     = isset($parts['port']) ? ':' . $parts['port'] : '';
-    $path     = $parts['path'] ?? '';
-    $query    = isset($parts['query']) && $parts['query'] !== '' ? '?' . $parts['query'] : '';
-    $fragment = isset($parts['fragment']) ? '#' . $parts['fragment'] : '';
+    if ($rules['suffix_find'] !== '') {
+        $suffix_length = strlen($rules['suffix_find']);
+        if ($suffix_length > 0 && strlen($updated) >= $suffix_length && substr($updated, -$suffix_length) === $rules['suffix_find']) {
+            $updated = substr($updated, 0, strlen($updated) - $suffix_length) . $rules['suffix_replace'];
+        }
+    } elseif ($rules['suffix_replace'] !== '') {
+        // If no suffix find term is configured, append the replacement directly.
+        $updated .= $rules['suffix_replace'];
+    }
 
-    return $scheme . $auth . $host . $port . $path . $query . $fragment;
+    /**
+     * Filter the transformed image URL prior to sanitization.
+     *
+     * @param string               $updated
+     * @param string               $original
+     * @param array<string, string> $rules
+     */
+    $updated = (string) apply_filters('hr_sa_image_url_replacement', $updated, $original, $rules);
+
+    $sanitized = hr_sa_sanitize_context_image_url($updated);
+
+    return $sanitized ?? $original;
 }

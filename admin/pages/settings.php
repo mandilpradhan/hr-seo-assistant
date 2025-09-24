@@ -33,7 +33,11 @@ function hr_sa_render_settings_page(): void
     }
     $site_name     = (string) hr_sa_get_setting('hr_sa_site_name', get_bloginfo('name'));
     $twitter       = (string) hr_sa_get_setting('hr_sa_twitter_handle');
-    $image_preset  = (string) get_option('hr_sa_image_preset', hr_sa_get_settings_defaults()['hr_sa_image_preset']);
+    $image_replace_enabled = (bool) hr_sa_get_setting('hr_sa_image_url_replace_enabled');
+    $image_prefix_find     = (string) hr_sa_get_setting('hr_sa_image_url_prefix_find');
+    $image_prefix_replace  = (string) hr_sa_get_setting('hr_sa_image_url_prefix_replace');
+    $image_suffix_find     = (string) hr_sa_get_setting('hr_sa_image_url_suffix_find');
+    $image_suffix_replace  = (string) hr_sa_get_setting('hr_sa_image_url_suffix_replace');
     $conflict_mode = hr_sa_get_conflict_mode();
     $debug_enabled = hr_sa_is_debug_enabled();
 
@@ -130,10 +134,34 @@ function hr_sa_render_settings_page(): void
                         </td>
                     </tr>
                     <tr>
-                        <th scope="row"><label for="hr_sa_image_preset"><?php esc_html_e('Image Preset (CDN)', HR_SA_TEXT_DOMAIN); ?></label></th>
+                        <th scope="row"><?php esc_html_e('Image URL Prefix/Suffix Replace', HR_SA_TEXT_DOMAIN); ?></th>
                         <td>
-                            <input type="text" id="hr_sa_image_preset" name="hr_sa_image_preset" value="<?php echo esc_attr($image_preset); ?>" class="regular-text" />
-                            <p class="description"><?php esc_html_e('Passed to the image CDN when resizing assets.', HR_SA_TEXT_DOMAIN); ?></p>
+                            <fieldset>
+                                <legend class="screen-reader-text"><?php esc_html_e('Image URL Prefix and Suffix Replacement', HR_SA_TEXT_DOMAIN); ?></legend>
+                                <label for="hr_sa_image_url_replace_enabled">
+                                    <input type="checkbox" id="hr_sa_image_url_replace_enabled" name="hr_sa_image_url_replace_enabled" value="1" <?php checked($image_replace_enabled); ?> />
+                                    <?php esc_html_e('Enable prefix/suffix replacement', HR_SA_TEXT_DOMAIN); ?>
+                                </label>
+                                <p class="description"><?php esc_html_e('Rewrite Open Graph image URLs using the rules below.', HR_SA_TEXT_DOMAIN); ?></p>
+                                <div class="hr-sa-image-replace-grid">
+                                    <div class="hr-sa-image-replace-field">
+                                        <label for="hr_sa_image_url_prefix_find"><?php esc_html_e('Prefix Find', HR_SA_TEXT_DOMAIN); ?></label>
+                                        <input type="text" class="regular-text" id="hr_sa_image_url_prefix_find" name="hr_sa_image_url_prefix_find" value="<?php echo esc_attr($image_prefix_find); ?>" />
+                                    </div>
+                                    <div class="hr-sa-image-replace-field">
+                                        <label for="hr_sa_image_url_prefix_replace"><?php esc_html_e('Prefix Replace', HR_SA_TEXT_DOMAIN); ?></label>
+                                        <input type="text" class="regular-text" id="hr_sa_image_url_prefix_replace" name="hr_sa_image_url_prefix_replace" value="<?php echo esc_attr($image_prefix_replace); ?>" />
+                                    </div>
+                                    <div class="hr-sa-image-replace-field">
+                                        <label for="hr_sa_image_url_suffix_find"><?php esc_html_e('Suffix Find', HR_SA_TEXT_DOMAIN); ?></label>
+                                        <input type="text" class="regular-text" id="hr_sa_image_url_suffix_find" name="hr_sa_image_url_suffix_find" value="<?php echo esc_attr($image_suffix_find); ?>" />
+                                    </div>
+                                    <div class="hr-sa-image-replace-field">
+                                        <label for="hr_sa_image_url_suffix_replace"><?php esc_html_e('Suffix Replace', HR_SA_TEXT_DOMAIN); ?></label>
+                                        <input type="text" class="regular-text" id="hr_sa_image_url_suffix_replace" name="hr_sa_image_url_suffix_replace" value="<?php echo esc_attr($image_suffix_replace); ?>" />
+                                    </div>
+                                </div>
+                            </fieldset>
                         </td>
                     </tr>
                     <tr>
@@ -150,7 +178,13 @@ function hr_sa_render_settings_page(): void
                                     <input type="radio" name="hr_sa_conflict_mode" value="force" <?php checked($conflict_mode, 'force'); ?> />
                                     <?php esc_html_e('Force HR SEO output', HR_SA_TEXT_DOMAIN); ?>
                                 </label>
+                                <br />
+                                <label>
+                                    <input type="radio" name="hr_sa_conflict_mode" value="block_og" <?php checked($conflict_mode, 'block_og'); ?> />
+                                    <?php esc_html_e('Block other OG insertions', HR_SA_TEXT_DOMAIN); ?>
+                                </label>
                                 <p class="description"><?php esc_html_e('Respect mode will defer JSON-LD when another SEO plugin is detected.', HR_SA_TEXT_DOMAIN); ?></p>
+                                <p class="description"><?php esc_html_e('Block mode removes third-party Open Graph tags to avoid duplicates.', HR_SA_TEXT_DOMAIN); ?></p>
                             </fieldset>
                         </td>
                     </tr>
