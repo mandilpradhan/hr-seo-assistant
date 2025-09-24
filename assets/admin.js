@@ -108,18 +108,29 @@
         }
     };
 
-    const copyWithClipboard = (text, onSuccess, onFailure) => {
+    const isSecureClipboardSupported = () => {
         const clipboard = navigator.clipboard;
-        const clipboardSupported = Boolean(clipboard && typeof clipboard.writeText === 'function');
+        const hasClipboardApi = Boolean(clipboard && typeof clipboard.writeText === 'function');
+        if (!hasClipboardApi) {
+            return false;
+        }
 
-        if (!clipboardSupported) {
+        if (typeof window.isSecureContext === 'boolean') {
+            return window.isSecureContext;
+        }
+
+        return window.location && window.location.protocol === 'https:';
+    };
+
+    const copyWithClipboard = (text, onSuccess, onFailure) => {
+        if (!isSecureClipboardSupported()) {
             fallbackCopy(text, onSuccess, onFailure);
             return;
         }
 
         let writeResult;
         try {
-            writeResult = clipboard.writeText(text);
+            writeResult = navigator.clipboard.writeText(text);
         } catch (error) {
             fallbackCopy(text, onSuccess, onFailure);
             return;
