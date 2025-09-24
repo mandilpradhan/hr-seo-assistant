@@ -37,6 +37,7 @@ function hr_sa_render_settings_page(): void
     $image_suffix_find     = (string) hr_sa_get_setting('hr_sa_image_url_suffix_find');
     $image_suffix_replace  = (string) hr_sa_get_setting('hr_sa_image_url_suffix_replace');
     $conflict_mode = hr_sa_get_conflict_mode();
+    $admin_bar_badge = (bool) hr_sa_get_setting('hr_sa_admin_bar_badge_enabled');
     $debug_enabled = hr_sa_is_debug_enabled();
     $ai_settings   = hr_sa_get_ai_settings();
     $ai_enabled    = (bool) $ai_settings['hr_sa_ai_enabled'];
@@ -211,6 +212,15 @@ function hr_sa_render_settings_page(): void
                                 </label>
                                 <p class="description"><?php esc_html_e('Respect mode yields to other SEO plugins when detected. Force mode outputs HR SEO Assistant metadata regardless of other plugins.', HR_SA_TEXT_DOMAIN); ?></p>
                             </fieldset>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="hr_sa_admin_bar_badge_enabled"><?php esc_html_e('Show Admin Bar Badge', HR_SA_TEXT_DOMAIN); ?></label></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" id="hr_sa_admin_bar_badge_enabled" name="hr_sa_admin_bar_badge_enabled" value="1" <?php checked($admin_bar_badge); ?> />
+                                <?php esc_html_e('Display the Open Graph image source badge in the WordPress admin bar.', HR_SA_TEXT_DOMAIN); ?>
+                            </label>
                         </td>
                     </tr>
                     <tr>

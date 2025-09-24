@@ -16,10 +16,22 @@ add_action('admin_head', 'hr_sa_output_admin_bar_styles');
 add_action('wp_head', 'hr_sa_output_admin_bar_styles');
 
 /**
+ * Whether the admin bar badge should be displayed.
+ */
+function hr_sa_admin_bar_badge_is_enabled(): bool
+{
+    return (bool) hr_sa_get_setting('hr_sa_admin_bar_badge_enabled');
+}
+
+/**
  * Register the OG image source badge in the admin bar.
  */
 function hr_sa_register_admin_bar_badge(WP_Admin_Bar $wp_admin_bar): void
 {
+    if (!hr_sa_admin_bar_badge_is_enabled()) {
+        return;
+    }
+
     if (!is_user_logged_in() || !current_user_can('manage_options') || !is_admin_bar_showing()) {
         return;
     }
@@ -77,6 +89,10 @@ function hr_sa_register_admin_bar_badge(WP_Admin_Bar $wp_admin_bar): void
  */
 function hr_sa_output_admin_bar_styles(): void
 {
+    if (!hr_sa_admin_bar_badge_is_enabled()) {
+        return;
+    }
+
     if (!is_user_logged_in() || !current_user_can('manage_options') || !is_admin_bar_showing()) {
         return;
     }
