@@ -84,23 +84,13 @@ function hr_sa_register_admin_menu(): void
  */
 function hr_sa_enqueue_admin_assets(string $hook_suffix): void
 {
-    $screen = get_current_screen();
-    if (!$screen) {
+    if (strpos($hook_suffix, 'hr-sa-') === false) {
         return;
     }
 
-    $allowed = [
-        'toplevel_page_hr-sa-overview',
-        'hr-sa-overview_page_hr-sa-settings',
-        'hr-sa-overview_page_hr-sa-modules',
-        'hr-sa-overview_page_hr-sa-debug',
-    ];
+    $is_settings_screen = strpos($hook_suffix, 'hr-sa-settings') !== false;
 
-    if (!in_array($screen->id, $allowed, true)) {
-        return;
-    }
-
-    if ($screen->id === 'hr-sa-overview_page_hr-sa-settings') {
+    if ($is_settings_screen) {
         wp_enqueue_media();
     }
 
@@ -111,10 +101,15 @@ function hr_sa_enqueue_admin_assets(string $hook_suffix): void
         HR_SA_VERSION
     );
 
+    $script_dependencies = ['wp-i18n'];
+    if ($is_settings_screen) {
+        $script_dependencies[] = 'media-editor';
+    }
+
     wp_enqueue_script(
         'hr-sa-admin',
         HR_SA_PLUGIN_URL . 'assets/admin.js',
-        ['wp-i18n', 'media-editor'],
+        $script_dependencies,
         HR_SA_VERSION,
         true
     );
