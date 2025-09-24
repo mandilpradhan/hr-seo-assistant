@@ -24,6 +24,64 @@ function hr_sa_bootstrap_og_module(): void
 add_action('init', 'hr_sa_bootstrap_og_module');
 
 /**
+ * Remove external OG emitters when conflict mode requests it.
+ */
+function hr_sa_maybe_block_external_og_tags(): void
+{
+    if (is_admin() || !hr_sa_should_block_external_og()) {
+        return;
+    }
+
+    $default_targets = [
+        [
+            'hook'     => 'wp_head',
+            'callback' => ['\WPTravelEngine\Plugin', 'wptravelengine_add_og_tag'],
+            'priority' => 5,
+        ],
+        [
+            'hook'     => 'wp_head',
+            'callback' => '\WPTravelEngine\Plugin::wptravelengine_add_og_tag',
+            'priority' => 5,
+        ],
+        [
+            'hook'     => 'wp_head',
+            'callback' => ['WPTravelEngine\Plugin', 'wptravelengine_add_og_tag'],
+            'priority' => 5,
+        ],
+        [
+            'hook'     => 'wp_head',
+            'callback' => 'WPTravelEngine\Plugin::wptravelengine_add_og_tag',
+            'priority' => 5,
+        ],
+    ];
+
+    /**
+     * Filter the list of third-party OG emitters that should be unhooked.
+     *
+     * @param array<int, array<string, mixed>> $default_targets
+     */
+    $targets = apply_filters('hr_sa_external_og_tag_hooks', $default_targets);
+
+    foreach ($targets as $target) {
+        if (!is_array($target)) {
+            continue;
+        }
+
+        $hook     = isset($target['hook']) ? (string) $target['hook'] : '';
+        $callback = $target['callback'] ?? null;
+        $priority = isset($target['priority']) ? (int) $target['priority'] : 10;
+
+        if ($hook === '' || $callback === null) {
+            continue;
+        }
+
+        remove_action($hook, $callback, $priority);
+    }
+}
+add_action('init', 'hr_sa_maybe_block_external_og_tags', 20);
+add_action('wp', 'hr_sa_maybe_block_external_og_tags', 1);
+
+/**
  * Schedule social meta output when appropriate.
  */
 function hr_sa_social_meta_maybe_schedule(): void

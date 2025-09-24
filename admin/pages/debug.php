@@ -30,6 +30,12 @@ function hr_sa_render_debug_page(): void
     $context      = hr_sa_get_context();
     $settings     = hr_sa_get_all_settings();
     $conflict     = hr_sa_get_conflict_mode();
+    $conflict_labels = [
+        'respect' => __('Respect other SEO plugins', HR_SA_TEXT_DOMAIN),
+        'force'   => __('Force HR SEO output', HR_SA_TEXT_DOMAIN),
+        'block_og' => __('Block other OG insertions', HR_SA_TEXT_DOMAIN),
+    ];
+    $conflict_label = $conflict_labels[$conflict] ?? ucfirst($conflict);
     $flags        = [
         'jsonld'  => hr_sa_is_jsonld_enabled(),
         'og'      => hr_sa_is_og_enabled(),
@@ -103,7 +109,7 @@ function hr_sa_render_debug_page(): void
                     </tr>
                     <tr>
                         <th scope="row"><?php esc_html_e('Conflict Mode', HR_SA_TEXT_DOMAIN); ?></th>
-                        <td><?php echo esc_html(ucfirst($conflict)); ?></td>
+                        <td><?php echo esc_html($conflict_label); ?></td>
                     </tr>
                     <tr>
                         <th scope="row"><?php esc_html_e('Detected SEO Plugins', HR_SA_TEXT_DOMAIN); ?></th>

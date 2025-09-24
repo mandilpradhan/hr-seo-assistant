@@ -97,10 +97,19 @@ function hr_sa_is_debug_enabled(): bool
  */
 function hr_sa_get_conflict_mode(): string
 {
-    $mode = (string) get_option('hr_sa_conflict_mode', 'respect');
-    $mode = $mode === 'force' ? 'force' : 'respect';
+    $mode    = (string) get_option('hr_sa_conflict_mode', 'respect');
+    $allowed = ['respect', 'force', 'block_og'];
+    $mode    = in_array($mode, $allowed, true) ? $mode : 'respect';
 
     return (string) apply_filters('hr_sa_conflict_mode', $mode);
+}
+
+/**
+ * Whether other plugins' OG injections should be unhooked.
+ */
+function hr_sa_should_block_external_og(): bool
+{
+    return hr_sa_get_conflict_mode() === 'block_og';
 }
 
 /**

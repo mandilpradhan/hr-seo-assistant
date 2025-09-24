@@ -58,6 +58,19 @@
     margin-top: 15px;
 }
 
+.hr-sa-image-replace-grid {
+    display: grid;
+    gap: 10px;
+    margin-top: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.hr-sa-image-replace-field label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
 .hr-sa-section {
     margin-top: 30px;
 }
