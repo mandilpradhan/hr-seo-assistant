@@ -106,25 +106,7 @@ function hr_sa_get_conflict_mode(): string
      *
      * @param string $mode
      */
-    $mode = (string) apply_filters('hr_sa_conflict_mode', $mode);
-
-    if ($mode === 'block_others') {
-        $mode = 'block_og';
-    }
-
-    return $mode;
-}
-
-/**
- * Convenience helper to compare the current conflict mode string.
- */
-function hr_sa_conflict_mode_is(string $mode): bool
-{
-    if ($mode === 'block_others') {
-        $mode = 'block_og';
-    }
-
-    return hr_sa_get_conflict_mode() === $mode;
+    return (string) apply_filters('hr_sa_conflict_mode', $mode);
 }
 
 /**
