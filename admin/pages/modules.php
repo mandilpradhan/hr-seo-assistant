@@ -76,7 +76,7 @@ function hr_sa_render_modules_page(): void
             if ($conflict_mode === 'respect') {
                 esc_html_e('Conflict mode is set to Respect, so HR SEO will yield when another SEO plugin is detected.', HR_SA_TEXT_DOMAIN);
             } elseif ($conflict_mode === 'block_og') {
-                esc_html_e('Conflict mode is set to Block, so third-party Open Graph tags will be removed before HR SEO runs.', HR_SA_TEXT_DOMAIN);
+                esc_html_e("Conflict mode is set to Block, so other plugins' Open Graph and Twitter meta will be removed before HR SEO runs.", HR_SA_TEXT_DOMAIN);
             } else {
                 esc_html_e('Conflict mode is set to Force. HR SEO output will run regardless of other SEO plugins.', HR_SA_TEXT_DOMAIN);
             }

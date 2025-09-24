@@ -19,67 +19,96 @@ $GLOBALS['hr_sa_last_social_snapshot'] = null;
  */
 function hr_sa_bootstrap_og_module(): void
 {
+    if (!is_admin()) {
+        hr_sa_maybe_register_external_og_scrub();
+    }
+
     add_action('wp', 'hr_sa_social_meta_maybe_schedule');
 }
 add_action('init', 'hr_sa_bootstrap_og_module');
 
 /**
- * Remove external OG emitters when conflict mode requests it.
+ * Register the OG scrubber callbacks when conflict mode requests it.
  */
-function hr_sa_maybe_block_external_og_tags(): void
+function hr_sa_maybe_register_external_og_scrub(): void
 {
-    if (is_admin() || !hr_sa_should_block_external_og()) {
+    if (!hr_sa_should_block_external_og()) {
         return;
     }
 
-    $default_targets = [
-        [
-            'hook'     => 'wp_head',
-            'callback' => ['\WPTravelEngine\Plugin', 'wptravelengine_add_og_tag'],
-            'priority' => 5,
-        ],
-        [
-            'hook'     => 'wp_head',
-            'callback' => '\WPTravelEngine\Plugin::wptravelengine_add_og_tag',
-            'priority' => 5,
-        ],
-        [
-            'hook'     => 'wp_head',
-            'callback' => ['WPTravelEngine\Plugin', 'wptravelengine_add_og_tag'],
-            'priority' => 5,
-        ],
-        [
-            'hook'     => 'wp_head',
-            'callback' => 'WPTravelEngine\Plugin::wptravelengine_add_og_tag',
-            'priority' => 5,
-        ],
-    ];
+    static $registered = false;
 
-    /**
-     * Filter the list of third-party OG emitters that should be unhooked.
-     *
-     * @param array<int, array<string, mixed>> $default_targets
-     */
-    $targets = apply_filters('hr_sa_external_og_tag_hooks', $default_targets);
-
-    foreach ($targets as $target) {
-        if (!is_array($target)) {
-            continue;
-        }
-
-        $hook     = isset($target['hook']) ? (string) $target['hook'] : '';
-        $callback = $target['callback'] ?? null;
-        $priority = isset($target['priority']) ? (int) $target['priority'] : 10;
-
-        if ($hook === '' || $callback === null) {
-            continue;
-        }
-
-        remove_action($hook, $callback, $priority);
+    if ($registered) {
+        return;
     }
+
+    $registered = true;
+
+    $scrub = static function (): void {
+        if (!hr_sa_should_block_external_og() || is_admin()) {
+            return;
+        }
+
+        global $wp_filter;
+
+        if (!isset($wp_filter['wp_head']) || !($wp_filter['wp_head'] instanceof WP_Hook)) {
+            return;
+        }
+
+        /** @var WP_Hook $hook */
+        $hook = $wp_filter['wp_head'];
+
+        if (empty($hook->callbacks[5]) || !is_array($hook->callbacks[5])) {
+            return;
+        }
+
+        $callbacks =& $hook->callbacks[5];
+        $backslash    = chr(92);
+        $target_class  = 'WPTravelEngine' . $backslash . 'Plugin';
+        $target_static = $target_class . '::wptravelengine_add_og_tag';
+
+        foreach ($callbacks as $id => $callback) {
+            if (empty($callback['function'])) {
+                continue;
+            }
+
+            $function = $callback['function'];
+
+            if (is_array($function)) {
+                if (count($function) < 2) {
+                    continue;
+                }
+
+                [$object_or_class, $method] = $function;
+                $class = is_object($object_or_class) ? get_class($object_or_class) : (string) $object_or_class;
+                $class = ltrim($class, $backslash);
+
+                if ($class === $target_class && $method === 'wptravelengine_add_og_tag') {
+                    unset($callbacks[$id]);
+                }
+
+                continue;
+            }
+
+            if (is_string($function)) {
+                $normalized = ltrim($function, $backslash);
+
+                if ($normalized === $target_static) {
+                    unset($callbacks[$id]);
+                }
+            }
+        }
+
+        if (empty($callbacks)) {
+            unset($hook->callbacks[5]);
+        }
+    };
+
+    add_action('wp', $scrub, 0);
+    add_action('get_header', $scrub, 0);
+    add_action('template_redirect', $scrub, 0);
+    add_action('wp_head', $scrub, 0);
 }
-add_action('init', 'hr_sa_maybe_block_external_og_tags', 20);
-add_action('wp', 'hr_sa_maybe_block_external_og_tags', 1);
 
 /**
  * Schedule social meta output when appropriate.

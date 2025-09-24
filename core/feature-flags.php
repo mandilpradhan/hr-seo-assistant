@@ -98,10 +98,33 @@ function hr_sa_is_debug_enabled(): bool
 function hr_sa_get_conflict_mode(): string
 {
     $mode    = (string) get_option('hr_sa_conflict_mode', 'respect');
-    $allowed = ['respect', 'force', 'block_og'];
+    $allowed = ['respect', 'force', 'block_og', 'block_others'];
     $mode    = in_array($mode, $allowed, true) ? $mode : 'respect';
 
-    return (string) apply_filters('hr_sa_conflict_mode', $mode);
+    /**
+     * Allow integrations to adjust the resolved conflict mode.
+     *
+     * @param string $mode
+     */
+    $mode = (string) apply_filters('hr_sa_conflict_mode', $mode);
+
+    if ($mode === 'block_others') {
+        $mode = 'block_og';
+    }
+
+    return $mode;
+}
+
+/**
+ * Convenience helper to compare the current conflict mode string.
+ */
+function hr_sa_conflict_mode_is(string $mode): bool
+{
+    if ($mode === 'block_others') {
+        $mode = 'block_og';
+    }
+
+    return hr_sa_get_conflict_mode() === $mode;
 }
 
 /**
@@ -109,7 +132,7 @@ function hr_sa_get_conflict_mode(): string
  */
 function hr_sa_should_block_external_og(): bool
 {
-    return hr_sa_get_conflict_mode() === 'block_og';
+    return hr_sa_conflict_mode_is('block_og');
 }
 
 /**
