@@ -96,16 +96,12 @@
             return;
         }
 
-        if (!mediaFrame) {
-            mediaFrame = wpGlobal.media({
-                title: __('Select fallback image', 'hr-seo-assistant'),
-                library: { type: 'image' },
-                button: { text: __('Use image', 'hr-seo-assistant') },
-                multiple: false,
-            });
-        }
-
-        mediaFrame.off('select');
+        mediaFrame = wpGlobal.media({
+            title: __('Select fallback image', 'hr-seo-assistant'),
+            library: { type: 'image' },
+            button: { text: __('Use image', 'hr-seo-assistant') },
+            multiple: false,
+        });
 
         mediaFrame.on('select', () => {
             const inputField = document.getElementById(targetId);
@@ -113,100 +109,49 @@
                 return;
             }
 
-            const selection = mediaFrame.state().get('selection');
-            const attachment = selection.first();
+            const state = mediaFrame.state();
+            const selection = state && typeof state.get === 'function' ? state.get('selection') : null;
+            const attachment = selection && typeof selection.first === 'function' ? selection.first() : null;
             if (!attachment) {
                 return;
             }
 
             const url = attachment.get('url');
-            inputField.value = url || '';
-            inputField.dispatchEvent(new Event('change', { bubbles: true }));
+            if (typeof url === 'string') {
+                inputField.value = url;
+                inputField.dispatchEvent(new Event('change', { bubbles: true }));
+            }
         });
 
         mediaFrame.open();
     };
 
-    const initLocaleControl = () => {
-        const select = document.querySelector(selectors.localeSelect);
-        if (!select) {
-            return;
-        }
-
-        const hiddenInputId = select.getAttribute('data-hidden-input');
-        const customInputId = select.getAttribute('data-custom-input');
-        const customValue = select.getAttribute('data-custom-value') || '__hr_sa_custom__';
-
-        if (!hiddenInputId || !customInputId) {
-            return;
-        }
-
-        const hiddenInput = document.getElementById(hiddenInputId);
-        const customInput = document.getElementById(customInputId);
-        if (!hiddenInput || !customInput) {
-            return;
-        }
-
-        const optionValues = Array.from(select.options).map((option) => option.value);
-
-        const syncSelect = () => {
-            const currentValue = hiddenInput.value;
-            if (optionValues.includes(currentValue)) {
-                select.value = currentValue;
-                customInput.classList.add('hr-sa-hidden');
-            } else {
-                select.value = customValue;
-                customInput.classList.remove('hr-sa-hidden');
-                customInput.value = currentValue;
-            }
-        };
-
-        syncSelect();
-
-        select.addEventListener('change', () => {
-            const selectedValue = select.value;
-            if (selectedValue === customValue) {
-                customInput.classList.remove('hr-sa-hidden');
-                customInput.focus();
-                hiddenInput.value = customInput.value.trim();
-                return;
-            }
-
-            customInput.classList.add('hr-sa-hidden');
-            hiddenInput.value = selectedValue;
-        });
-
-        customInput.addEventListener('input', () => {
-            hiddenInput.value = customInput.value.trim();
+    const bindMediaButtons = () => {
+        const buttons = document.querySelectorAll(selectors.mediaButton);
+        buttons.forEach((button) => {
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                const targetId = button.getAttribute('data-target');
+                if (targetId) {
+                    openMediaFrame(targetId);
+                }
+            });
         });
     };
 
-    const handleDocumentClick = (event) => {
-        const target = event.target;
-        if (!(target instanceof HTMLElement)) {
-            return;
-        }
-
-        const mediaButton = target.closest(selectors.mediaButton);
-        if (mediaButton) {
-            event.preventDefault();
-            const targetId = mediaButton.getAttribute('data-target');
-            if (targetId) {
-                openMediaFrame(targetId);
-            }
-            return;
-        }
-
-        const copyButton = target.closest(selectors.copyButton);
-        if (copyButton) {
-            event.preventDefault();
-            handleCopy(copyButton);
-        }
+    const bindCopyButtons = () => {
+        const buttons = document.querySelectorAll(selectors.copyButton);
+        buttons.forEach((button) => {
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                handleCopy(button);
+            });
+        });
     };
 
     const init = () => {
-        document.addEventListener('click', handleDocumentClick);
-        initLocaleControl();
+        bindMediaButtons();
+        bindCopyButtons();
     };
 
     if (document.readyState === 'loading') {

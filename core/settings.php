@@ -288,37 +288,6 @@ function hr_sa_get_all_settings(): array
     return $settings;
 }
 
-/**
- * Add a success notice when settings are updated.
- */
-function hr_sa_settings_admin_notices(): void
-{
-    if (!current_user_can('manage_options')) {
-        return;
-    }
-
-    $page = isset($_GET['page']) ? sanitize_text_field(wp_unslash((string) $_GET['page'])) : '';
-    if ($page !== 'hr-sa-settings') {
-        return;
-    }
-
-    $updated_flag = isset($_GET['settings-updated'])
-        ? sanitize_text_field(wp_unslash((string) $_GET['settings-updated']))
-        : '';
-
-    if ($updated_flag === 'true' || $updated_flag === '1') {
-        add_settings_error('hr_sa_settings', 'hr_sa_settings_saved', __('Settings saved.', HR_SA_TEXT_DOMAIN), 'updated');
-    } elseif ($updated_flag === 'false' || $updated_flag === '0') {
-        add_settings_error(
-            'hr_sa_settings',
-            'hr_sa_settings_failed',
-            __('Settings could not be saved. Please review the fields below and try again.', HR_SA_TEXT_DOMAIN)
-        );
-    }
-
-    settings_errors('hr_sa_settings');
-}
-add_action('admin_notices', 'hr_sa_settings_admin_notices');
 
 /**
  * Retrieve the configured image preset value with filter support.

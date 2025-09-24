@@ -100,6 +100,10 @@ function hr_sa_enqueue_admin_assets(string $hook_suffix): void
         return;
     }
 
+    if ($screen->id === 'hr-sa-overview_page_hr-sa-settings') {
+        wp_enqueue_media();
+    }
+
     wp_enqueue_style(
         'hr-sa-admin',
         HR_SA_PLUGIN_URL . 'assets/admin.css',
@@ -116,8 +120,4 @@ function hr_sa_enqueue_admin_assets(string $hook_suffix): void
     );
 
     wp_set_script_translations('hr-sa-admin', HR_SA_TEXT_DOMAIN);
-
-    if ($screen->id === 'hr-sa-overview_page_hr-sa-settings') {
-        wp_enqueue_media();
-    }
 }
