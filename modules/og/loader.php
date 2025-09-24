@@ -19,95 +19,81 @@ $GLOBALS['hr_sa_last_social_snapshot'] = null;
  */
 function hr_sa_bootstrap_og_module(): void
 {
-    if (!is_admin()) {
-        hr_sa_maybe_register_external_og_scrub();
-    }
-
+    hr_sa_maybe_register_external_og_scrub();
     add_action('wp', 'hr_sa_social_meta_maybe_schedule');
 }
 add_action('init', 'hr_sa_bootstrap_og_module');
 
 /**
- * Register the OG scrubber callbacks when conflict mode requests it.
+ * Register the WP Travel Engine OG scrubber when requested.
  */
 function hr_sa_maybe_register_external_og_scrub(): void
 {
-    if (!hr_sa_should_block_external_og()) {
+    if (!hr_sa_conflict_mode_is('block_others')) {
         return;
     }
 
+    static $scrubber = null;
     static $registered = false;
 
     if ($registered) {
         return;
     }
 
-    $registered = true;
-
-    $scrub = static function (): void {
-        if (!hr_sa_should_block_external_og() || is_admin()) {
-            return;
-        }
-
-        global $wp_filter;
-
-        if (!isset($wp_filter['wp_head']) || !($wp_filter['wp_head'] instanceof WP_Hook)) {
-            return;
-        }
-
-        /** @var WP_Hook $hook */
-        $hook = $wp_filter['wp_head'];
-
-        if (empty($hook->callbacks[5]) || !is_array($hook->callbacks[5])) {
-            return;
-        }
-
-        $callbacks =& $hook->callbacks[5];
-        $backslash    = chr(92);
-        $target_class  = 'WPTravelEngine' . $backslash . 'Plugin';
-        $target_static = $target_class . '::wptravelengine_add_og_tag';
-
-        foreach ($callbacks as $id => $callback) {
-            if (empty($callback['function'])) {
-                continue;
+    if ($scrubber === null) {
+        $scrubber = static function (): void {
+            if (!hr_sa_conflict_mode_is('block_others')) {
+                return;
             }
 
-            $function = $callback['function'];
+            global $wp_filter;
 
-            if (is_array($function)) {
-                if (count($function) < 2) {
+            if (empty($wp_filter['wp_head']) || empty($wp_filter['wp_head']->callbacks)) {
+                return;
+            }
+
+            $target_class  = 'WPTravelEngine\\Plugin';
+            $target_method = 'wptravelengine_add_og_tag';
+
+            foreach ($wp_filter['wp_head']->callbacks as $priority => &$bucket) {
+                if (!is_array($bucket)) {
                     continue;
                 }
 
-                [$object_or_class, $method] = $function;
-                $class = is_object($object_or_class) ? get_class($object_or_class) : (string) $object_or_class;
-                $class = ltrim($class, $backslash);
+                foreach ($bucket as $id => $cb) {
+                    if (empty($cb['function']) || !is_array($cb['function'])) {
+                        continue;
+                    }
 
-                if ($class === $target_class && $method === 'wptravelengine_add_og_tag') {
-                    unset($callbacks[$id]);
+                    [$obj_or_class, $method] = $cb['function'];
+
+                    if (strcasecmp((string) $method, $target_method) !== 0) {
+                        continue;
+                    }
+
+                    $class = is_object($obj_or_class) ? get_class($obj_or_class) : (string) $obj_or_class;
+                    $class_match = ($class === $target_class)
+                        || (stripos($class, 'WPTravelEngine') !== false && substr($class, -strlen('\\Plugin')) === '\\Plugin');
+
+                    if ($class_match) {
+                        unset($bucket[$id]);
+                    }
                 }
 
-                continue;
-            }
-
-            if (is_string($function)) {
-                $normalized = ltrim($function, $backslash);
-
-                if ($normalized === $target_static) {
-                    unset($callbacks[$id]);
+                if (empty($bucket)) {
+                    unset($wp_filter['wp_head']->callbacks[$priority]);
                 }
             }
-        }
+            unset($bucket);
+        };
+    }
 
-        if (empty($callbacks)) {
-            unset($hook->callbacks[5]);
-        }
-    };
+    add_action('wp', $scrubber, 0);
+    add_action('get_header', $scrubber, 0);
+    add_action('template_redirect', $scrubber, 0);
+    add_action('wp_head', $scrubber, 0);
 
-    add_action('wp', $scrub, 0);
-    add_action('get_header', $scrub, 0);
-    add_action('template_redirect', $scrub, 0);
-    add_action('wp_head', $scrub, 0);
+    $registered = true;
 }
 
 /**
