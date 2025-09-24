@@ -1,7 +1,3 @@
-provide the following as a downloadable MD file. 
-
-
-📑 AGENT.md
 # HR SEO Assistant — Agent Instructions
 
 This file is for any code generation agent (Codex or similar) working on this repository.  
