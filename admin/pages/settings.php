@@ -40,6 +40,13 @@ function hr_sa_render_settings_page(): void
     $image_suffix_replace  = (string) hr_sa_get_setting('hr_sa_image_url_suffix_replace');
     $conflict_mode = hr_sa_get_conflict_mode();
     $debug_enabled = hr_sa_is_debug_enabled();
+    $ai_settings   = hr_sa_get_ai_settings();
+    $ai_enabled    = (bool) $ai_settings['hr_sa_ai_enabled'];
+    $ai_model      = (string) $ai_settings['hr_sa_ai_model'];
+    $ai_temperature = (float) $ai_settings['hr_sa_ai_temperature'];
+    $ai_max_tokens = (int) $ai_settings['hr_sa_ai_max_tokens'];
+    $ai_key_masked = hr_sa_mask_api_key_for_display($ai_settings['hr_sa_ai_api_key']);
+    $ai_has_key    = $ai_settings['hr_sa_ai_api_key'] !== '';
 
     $updated_flag = isset($_GET['settings-updated'])
         ? sanitize_text_field(wp_unslash((string) $_GET['settings-updated']))
@@ -88,6 +95,44 @@ function hr_sa_render_settings_page(): void
                                     <?php esc_html_e('Enable Twitter Card tags', HR_SA_TEXT_DOMAIN); ?>
                                 </label>
                                 <p class="description"><?php esc_html_e('Twitter Cards reuse Open Graph data and require a large hero image or fallback.', HR_SA_TEXT_DOMAIN); ?></p>
+                            </fieldset>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('AI Assistance', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td>
+                            <fieldset>
+                                <legend class="screen-reader-text"><?php esc_html_e('AI Assistance', HR_SA_TEXT_DOMAIN); ?></legend>
+                                <label for="hr_sa_ai_enabled">
+                                    <input type="checkbox" id="hr_sa_ai_enabled" name="hr_sa_ai_enabled" value="1" <?php checked($ai_enabled); ?> />
+                                    <?php esc_html_e('Enable AI assistance for administrators', HR_SA_TEXT_DOMAIN); ?>
+                                </label>
+                                <p class="description hr-sa-ai-hint"><?php esc_html_e('Admin-only. No front-end API calls will ever occur.', HR_SA_TEXT_DOMAIN); ?></p>
+                                <div class="hr-sa-ai-settings">
+                                    <div class="hr-sa-ai-settings__field">
+                                        <label for="hr_sa_ai_api_key"><?php esc_html_e('API Key', HR_SA_TEXT_DOMAIN); ?></label>
+                                        <input type="password" id="hr_sa_ai_api_key" name="hr_sa_ai_api_key" value="<?php echo esc_attr($ai_has_key ? $ai_key_masked : ''); ?>" class="regular-text" autocomplete="off" />
+                                    </div>
+                                    <div class="hr-sa-ai-settings__field">
+                                        <label for="hr_sa_ai_model"><?php esc_html_e('Model', HR_SA_TEXT_DOMAIN); ?></label>
+                                        <input type="text" id="hr_sa_ai_model" name="hr_sa_ai_model" value="<?php echo esc_attr($ai_model); ?>" class="regular-text" />
+                                    </div>
+                                    <div class="hr-sa-ai-settings__field">
+                                        <label for="hr_sa_ai_temperature"><?php esc_html_e('Temperature', HR_SA_TEXT_DOMAIN); ?></label>
+                                        <input type="number" id="hr_sa_ai_temperature" name="hr_sa_ai_temperature" value="<?php echo esc_attr(number_format($ai_temperature, 2, '.', '')); ?>" step="0.1" min="0" max="2" />
+                                    </div>
+                                    <div class="hr-sa-ai-settings__field">
+                                        <label for="hr_sa_ai_max_tokens"><?php esc_html_e('Max Tokens', HR_SA_TEXT_DOMAIN); ?></label>
+                                        <input type="number" id="hr_sa_ai_max_tokens" name="hr_sa_ai_max_tokens" value="<?php echo esc_attr((string) $ai_max_tokens); ?>" min="1" max="4096" />
+                                    </div>
+                                </div>
+                                <button type="button" class="button hr-sa-ai-test"><?php esc_html_e('Test Connection', HR_SA_TEXT_DOMAIN); ?></button>
+                                <span class="hr-sa-ai-test-result" data-hr-sa-ai-result></span>
+                                <?php if ($ai_enabled && !$ai_has_key) : ?>
+                                    <div class="notice notice-warning inline hr-sa-ai-warning">
+                                        <p><?php esc_html_e('AI assistance is enabled, but no API key has been provided yet.', HR_SA_TEXT_DOMAIN); ?></p>
+                                    </div>
+                                <?php endif; ?>
                             </fieldset>
                         </td>
                     </tr>

@@ -9,7 +9,11 @@
         copyButton: '.hr-sa-copy-json',
         localeSelect: '.hr-sa-locale-selector',
         fallbackInput: '#hr_sa_fallback_image',
+        aiTestButton: '.hr-sa-ai-test',
+        aiTestResult: '[data-hr-sa-ai-result]',
     };
+
+    const aiSettings = window.hrSaAdminSettings || null;
 
     const normalizeToHttps = (rawUrl) => {
         if (typeof rawUrl !== 'string') {
@@ -282,10 +286,132 @@
         field.addEventListener('change', normalizeField);
     };
 
+    const setAiTestResult = (message, status) => {
+        const resultNode = document.querySelector(selectors.aiTestResult);
+        if (!resultNode) {
+            if (status === 'error') {
+                window.alert(message);
+            }
+            return;
+        }
+
+        if (typeof message === 'string') {
+            resultNode.textContent = message;
+        }
+
+        if (status) {
+            resultNode.setAttribute('data-state', status);
+        } else {
+            resultNode.removeAttribute('data-state');
+        }
+    };
+
+    const bindAiTestButton = () => {
+        if (!aiSettings || !selectors.aiTestButton) {
+            return;
+        }
+
+        const button = document.querySelector(selectors.aiTestButton);
+        if (!button) {
+            return;
+        }
+
+        let isPending = false;
+
+        const toggleButtonState = (loading) => {
+            if (loading) {
+                button.classList.add('hr-sa-btn-loading');
+                button.setAttribute('disabled', 'disabled');
+            } else {
+                button.classList.remove('hr-sa-btn-loading');
+                button.removeAttribute('disabled');
+            }
+        };
+
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+
+            if (typeof window.fetch !== 'function') {
+                window.alert(__('Your browser does not support the fetch API.', 'hr-seo-assistant'));
+                return;
+            }
+
+            if (isPending) {
+                return;
+            }
+
+            if (!aiSettings.aiEnabled) {
+                const disabledMessage = aiSettings.messages && aiSettings.messages.disabled
+                    ? aiSettings.messages.disabled
+                    : __('Enable AI assistance before testing the connection.', 'hr-seo-assistant');
+                setAiTestResult(disabledMessage, 'error');
+                return;
+            }
+
+            if (!aiSettings.hasKey) {
+                const missingKeyMessage = aiSettings.messages && aiSettings.messages.missingKey
+                    ? aiSettings.messages.missingKey
+                    : __('Add an API key before testing the connection.', 'hr-seo-assistant');
+                setAiTestResult(missingKeyMessage, 'error');
+                return;
+            }
+
+            isPending = true;
+            toggleButtonState(true);
+
+            const testingMessage = aiSettings.messages && aiSettings.messages.testing
+                ? aiSettings.messages.testing
+                : __('Testing connection…', 'hr-seo-assistant');
+            setAiTestResult(testingMessage, 'pending');
+
+            const params = new window.URLSearchParams();
+            params.append('action', 'hr_sa_ai_test_connection');
+            params.append('nonce', aiSettings.nonceTest);
+
+            fetch(aiSettings.ajaxUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                },
+                body: params.toString(),
+            })
+                .then((response) => response.json())
+                .then((payload) => {
+                    if (payload && payload.success) {
+                        const successMessage = payload.data && payload.data.message
+                            ? payload.data.message
+                            : (aiSettings.messages && aiSettings.messages.success
+                                ? aiSettings.messages.success
+                                : __('Connection successful.', 'hr-seo-assistant'));
+                        setAiTestResult(successMessage, 'success');
+                    } else {
+                        const errorMessage = payload && payload.data && payload.data.message
+                            ? payload.data.message
+                            : (aiSettings.messages && aiSettings.messages.error
+                                ? aiSettings.messages.error
+                                : __('Unable to reach the AI service. Please check your settings and try again.', 'hr-seo-assistant'));
+                        setAiTestResult(errorMessage, 'error');
+                    }
+                })
+                .catch(() => {
+                    const errorMessage = aiSettings.messages && aiSettings.messages.error
+                        ? aiSettings.messages.error
+                        : __('Unable to reach the AI service. Please check your settings and try again.', 'hr-seo-assistant');
+                    setAiTestResult(errorMessage, 'error');
+                })
+                .finally(() => {
+                    isPending = false;
+                    toggleButtonState(false);
+                });
+        });
+    };
+
     const init = () => {
         bindMediaButtons();
         bindCopyButtons();
         bindFallbackNormalization();
+        bindAiTestButton();
     };
 
     if (document.readyState === 'loading') {

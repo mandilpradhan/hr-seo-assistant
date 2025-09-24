@@ -46,6 +46,10 @@ function hr_sa_render_debug_page(): void
     $has_hero     = $hero_url !== null;
     $other_seo    = hr_sa_other_seo_active();
     $emitters     = function_exists('hr_sa_jsonld_get_active_emitters') ? hr_sa_jsonld_get_active_emitters() : [];
+    $ai_snapshot  = hr_sa_ai_get_settings();
+    $ai_full      = hr_sa_get_ai_settings();
+    $ai_key_masked = hr_sa_mask_api_key_for_display($ai_full['hr_sa_ai_api_key']);
+    $ai_summary   = hr_sa_ai_get_last_request_summary();
     $social_snapshot = function_exists('hr_sa_get_social_tag_snapshot')
         ? hr_sa_get_social_tag_snapshot()
         : [
@@ -160,6 +164,71 @@ function hr_sa_render_debug_page(): void
                     </tr>
                 </tbody>
             </table>
+        </section>
+
+        <section class="hr-sa-section">
+            <h2><?php esc_html_e('AI Assistance', HR_SA_TEXT_DOMAIN); ?></h2>
+            <?php if (!empty($ai_snapshot['hr_sa_ai_enabled']) && empty($ai_snapshot['hr_sa_ai_has_key'])) : ?>
+                <div class="notice notice-warning inline">
+                    <p><?php esc_html_e('AI assistance is enabled, but no API key is configured.', HR_SA_TEXT_DOMAIN); ?></p>
+                </div>
+            <?php endif; ?>
+            <table class="widefat striped">
+                <tbody>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Enabled', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td><?php echo !empty($ai_snapshot['hr_sa_ai_enabled']) ? esc_html__('Yes', HR_SA_TEXT_DOMAIN) : esc_html__('No', HR_SA_TEXT_DOMAIN); ?></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('API Key', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td><?php echo $ai_key_masked !== '' ? esc_html($ai_key_masked) : esc_html__('Not provided', HR_SA_TEXT_DOMAIN); ?></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Model', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td><code><?php echo esc_html($ai_snapshot['hr_sa_ai_model']); ?></code></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Temperature', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td><?php echo esc_html(number_format_i18n((float) $ai_full['hr_sa_ai_temperature'], 2)); ?></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Max Tokens', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td><?php echo esc_html(number_format_i18n((int) $ai_full['hr_sa_ai_max_tokens'])); ?></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3><?php esc_html_e('Last AI Request', HR_SA_TEXT_DOMAIN); ?></h3>
+            <?php if ($ai_summary) : ?>
+                <?php
+                $summary_type    = isset($ai_summary['type']) ? ucwords(str_replace('_', ' ', (string) $ai_summary['type'])) : '';
+                $summary_status  = isset($ai_summary['status']) ? ucwords((string) $ai_summary['status']) : '';
+                $summary_message = isset($ai_summary['message']) ? (string) $ai_summary['message'] : '';
+                $summary_time    = !empty($ai_summary['timestamp']) ? date_i18n(get_option('date_format') . ' ' . get_option('time_format'), (int) $ai_summary['timestamp']) : '';
+                ?>
+                <table class="widefat striped">
+                    <tbody>
+                        <tr>
+                            <th scope="row"><?php esc_html_e('Type', HR_SA_TEXT_DOMAIN); ?></th>
+                            <td><?php echo $summary_type !== '' ? esc_html($summary_type) : esc_html__('N/A', HR_SA_TEXT_DOMAIN); ?></td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><?php esc_html_e('Status', HR_SA_TEXT_DOMAIN); ?></th>
+                            <td><?php echo $summary_status !== '' ? esc_html($summary_status) : esc_html__('N/A', HR_SA_TEXT_DOMAIN); ?></td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><?php esc_html_e('Message', HR_SA_TEXT_DOMAIN); ?></th>
+                            <td><?php echo $summary_message !== '' ? esc_html($summary_message) : esc_html__('N/A', HR_SA_TEXT_DOMAIN); ?></td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><?php esc_html_e('Timestamp', HR_SA_TEXT_DOMAIN); ?></th>
+                            <td><?php echo $summary_time !== '' ? esc_html($summary_time) : esc_html__('N/A', HR_SA_TEXT_DOMAIN); ?></td>
+                        </tr>
+                    </tbody>
+                </table>
+            <?php else : ?>
+                <p class="description"><?php esc_html_e('No AI requests have been recorded yet.', HR_SA_TEXT_DOMAIN); ?></p>
+            <?php endif; ?>
         </section>
 
         <section class="hr-sa-section">
