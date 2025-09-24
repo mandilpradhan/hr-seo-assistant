@@ -100,6 +100,18 @@ function hr_sa_register_settings(): void
         'default'           => hr_sa_get_settings_defaults()['hr_sa_image_preset'],
     ]);
 
+    register_setting('hr_sa_settings', 'hr_sa_og_enabled', [
+        'type'              => 'boolean',
+        'sanitize_callback' => 'hr_sa_sanitize_checkbox',
+        'default'           => '0',
+    ]);
+
+    register_setting('hr_sa_settings', 'hr_sa_twitter_enabled', [
+        'type'              => 'boolean',
+        'sanitize_callback' => 'hr_sa_sanitize_checkbox',
+        'default'           => '0',
+    ]);
+
     register_setting('hr_sa_settings', 'hr_sa_conflict_mode', [
         'type'              => 'string',
         'sanitize_callback' => 'hr_sa_sanitize_conflict_mode',
@@ -228,7 +240,7 @@ function hr_sa_get_setting(string $option, $default = null)
     $default = $default ?? ($defaults[$option] ?? '');
     $value = get_option($option, $default);
 
-    if (in_array($option, ['hr_sa_tpl_page_brand_suffix', 'hr_sa_debug_enabled'], true)) {
+    if (in_array($option, ['hr_sa_tpl_page_brand_suffix', 'hr_sa_debug_enabled', 'hr_sa_og_enabled', 'hr_sa_twitter_enabled'], true)) {
         return $value === '1' || $value === 1 || $value === true;
     }
 
@@ -249,6 +261,8 @@ function hr_sa_get_all_settings(): array
 
     $settings['hr_sa_tpl_page_brand_suffix'] = hr_sa_get_setting('hr_sa_tpl_page_brand_suffix');
     $settings['hr_sa_debug_enabled'] = hr_sa_get_setting('hr_sa_debug_enabled');
+    $settings['hr_sa_og_enabled'] = hr_sa_is_flag_enabled('hr_sa_og_enabled');
+    $settings['hr_sa_twitter_enabled'] = hr_sa_is_flag_enabled('hr_sa_twitter_enabled');
 
     return $settings;
 }

@@ -3,7 +3,7 @@
  * Plugin Name: HR SEO Assistant
  * Plugin URI:  https://github.com/mandilpradhan/hr-seo-assistant
  * Description: Provides SEO scaffolding, settings, feature flags, and JSON-LD emitters for Himalayan Rides.
- * Version:     0.1.0
+ * Version:     0.2.0
  * Author:      Himalayan Rides
  * License:     GPL-2.0-or-later
  * Text Domain: hr-seo-assistant
@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-const HR_SA_VERSION     = '0.1.0';
+const HR_SA_VERSION     = '0.2.0';
 const HR_SA_PLUGIN_FILE = __FILE__;
 const HR_SA_PLUGIN_DIR  = __DIR__ . '/';
 const HR_SA_TEXT_DOMAIN = 'hr-seo-assistant';

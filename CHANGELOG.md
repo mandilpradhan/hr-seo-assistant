@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Planned
+- **0.3.0**: Template polish, description fallback order, preview card.
+- **1.0.0**: Stable release – OG + JSON-LD parity, diagnostics.
+- **2.0.0**: AI Assist module (OpenAI) for titles/descriptions/keywords.
+
+## [0.2.0] - 2025-09-24
+### Added
+- Open Graph and Twitter Card emission driven by the shared context provider with hero/fallback image resolution.
+- Admin settings toggles for Open Graph and Twitter metadata, including optional Twitter handle field output and social snapshot on the Debug page.
+- New filters `hr_sa_enable_og`, `hr_sa_enable_twitter`, `hr_sa_og_tags`, and `hr_sa_twitter_tags` for extensibility.
+
+### Changed
+- Context provider now resolves titles, descriptions, countries, and hero images from post data, templates, and plugin settings.
+- Debug interface now surfaces social metadata, resolved values, and emission status alongside existing diagnostics.
+
 ## [0.1.0] - 2025-09-23
 ### Added
 - Initial scaffold for **HR SEO Assistant** plugin.
@@ -17,10 +33,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Notes
 - No OG/Twitter emission yet (planned for 0.2.0).
 - JSON-LD emitters to be adopted from **legacy MUs** in Phase 0 while preserving output parity.
-
-## [Unreleased]
-### Planned
-- **0.2.0**: OG/Twitter emitter (hero → fallback), minimal templates.
-- **0.3.0**: Template polish, description fallback order, preview card.
-- **1.0.0**: Stable release – OG + JSON-LD parity, diagnostics.
-- **2.0.0**: AI Assist module (OpenAI) for titles/descriptions/keywords.

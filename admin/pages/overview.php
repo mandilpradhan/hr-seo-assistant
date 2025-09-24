@@ -37,7 +37,8 @@ function hr_sa_render_overview_page(): void
                 <p><?php echo esc_html(sprintf(__('Version %s', HR_SA_TEXT_DOMAIN), $version)); ?></p>
                 <ul>
                     <li><?php echo esc_html__('JSON-LD Emitters', HR_SA_TEXT_DOMAIN) . ': ' . (hr_sa_is_jsonld_enabled() ? esc_html__('Enabled', HR_SA_TEXT_DOMAIN) : esc_html__('Disabled', HR_SA_TEXT_DOMAIN)); ?></li>
-                    <li><?php echo esc_html__('OG/Twitter Module', HR_SA_TEXT_DOMAIN) . ': ' . (hr_sa_is_og_enabled() ? esc_html__('Enabled', HR_SA_TEXT_DOMAIN) : esc_html__('Disabled', HR_SA_TEXT_DOMAIN)); ?></li>
+                    <li><?php echo esc_html__('Open Graph Tags', HR_SA_TEXT_DOMAIN) . ': ' . (hr_sa_is_og_enabled() ? esc_html__('Enabled', HR_SA_TEXT_DOMAIN) : esc_html__('Disabled', HR_SA_TEXT_DOMAIN)); ?></li>
+                    <li><?php echo esc_html__('Twitter Cards', HR_SA_TEXT_DOMAIN) . ': ' . (hr_sa_is_twitter_enabled() ? esc_html__('Enabled', HR_SA_TEXT_DOMAIN) : esc_html__('Disabled', HR_SA_TEXT_DOMAIN)); ?></li>
                     <li><?php echo esc_html__('Debug Mode', HR_SA_TEXT_DOMAIN) . ': ' . ($debug_on ? esc_html__('Enabled', HR_SA_TEXT_DOMAIN) : esc_html__('Disabled', HR_SA_TEXT_DOMAIN)); ?></li>
                 </ul>
             </div>

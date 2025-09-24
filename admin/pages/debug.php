@@ -31,14 +31,43 @@ function hr_sa_render_debug_page(): void
     $settings     = hr_sa_get_all_settings();
     $conflict     = hr_sa_get_conflict_mode();
     $flags        = [
-        'jsonld' => hr_sa_is_jsonld_enabled(),
-        'og'     => hr_sa_is_og_enabled(),
-        'debug'  => hr_sa_is_debug_enabled(),
+        'jsonld'  => hr_sa_is_jsonld_enabled(),
+        'og'      => hr_sa_is_og_enabled(),
+        'twitter' => hr_sa_is_twitter_enabled(),
+        'debug'   => hr_sa_is_debug_enabled(),
     ];
     $hero_url     = hr_sa_get_media_help_hero_url();
     $has_hero     = $hero_url !== null;
     $other_seo    = hr_sa_other_seo_active();
     $emitters     = function_exists('hr_sa_jsonld_get_active_emitters') ? hr_sa_jsonld_get_active_emitters() : [];
+    $social_snapshot = function_exists('hr_sa_get_social_tag_snapshot')
+        ? hr_sa_get_social_tag_snapshot()
+        : [
+            'og_enabled'      => false,
+            'twitter_enabled' => false,
+            'blocked'         => false,
+            'og'              => [],
+            'twitter'         => [],
+            'fields'          => [
+                'title'          => '',
+                'description'    => '',
+                'url'            => '',
+                'image'          => '',
+                'site_name'      => '',
+                'locale'         => '',
+                'twitter_handle' => '',
+            ],
+        ];
+    $social_fields = is_array($social_snapshot['fields'] ?? null) ? $social_snapshot['fields'] : [];
+    $field_labels  = [
+        'title'          => __('Title', HR_SA_TEXT_DOMAIN),
+        'description'    => __('Description', HR_SA_TEXT_DOMAIN),
+        'url'            => __('URL', HR_SA_TEXT_DOMAIN),
+        'image'          => __('Image', HR_SA_TEXT_DOMAIN),
+        'site_name'      => __('Site Name', HR_SA_TEXT_DOMAIN),
+        'locale'         => __('Locale', HR_SA_TEXT_DOMAIN),
+        'twitter_handle' => __('Twitter Handle', HR_SA_TEXT_DOMAIN),
+    ];
     $copy_payload = [
         'context'  => $context,
         'settings' => $settings,
@@ -82,7 +111,8 @@ function hr_sa_render_debug_page(): void
                         <td>
                             <ul>
                                 <li><?php esc_html_e('JSON-LD', HR_SA_TEXT_DOMAIN); ?>: <?php echo $flags['jsonld'] ? esc_html__('On', HR_SA_TEXT_DOMAIN) : esc_html__('Off', HR_SA_TEXT_DOMAIN); ?></li>
-                                <li><?php esc_html_e('OG/Twitter', HR_SA_TEXT_DOMAIN); ?>: <?php echo $flags['og'] ? esc_html__('On', HR_SA_TEXT_DOMAIN) : esc_html__('Off', HR_SA_TEXT_DOMAIN); ?></li>
+                                <li><?php esc_html_e('Open Graph', HR_SA_TEXT_DOMAIN); ?>: <?php echo $flags['og'] ? esc_html__('On', HR_SA_TEXT_DOMAIN) : esc_html__('Off', HR_SA_TEXT_DOMAIN); ?></li>
+                                <li><?php esc_html_e('Twitter Cards', HR_SA_TEXT_DOMAIN); ?>: <?php echo $flags['twitter'] ? esc_html__('On', HR_SA_TEXT_DOMAIN) : esc_html__('Off', HR_SA_TEXT_DOMAIN); ?></li>
                                 <li><?php esc_html_e('Debug', HR_SA_TEXT_DOMAIN); ?>: <?php echo $flags['debug'] ? esc_html__('On', HR_SA_TEXT_DOMAIN) : esc_html__('Off', HR_SA_TEXT_DOMAIN); ?></li>
                             </ul>
                         </td>
@@ -121,6 +151,60 @@ function hr_sa_render_debug_page(): void
                     </tr>
                 </tbody>
             </table>
+        </section>
+
+        <section class="hr-sa-section">
+            <h2><?php esc_html_e('Social Metadata', HR_SA_TEXT_DOMAIN); ?></h2>
+            <ul class="hr-sa-meta-status">
+                <li><?php esc_html_e('Open Graph', HR_SA_TEXT_DOMAIN); ?>: <?php echo !empty($social_snapshot['og_enabled']) ? esc_html__('Enabled', HR_SA_TEXT_DOMAIN) : esc_html__('Disabled', HR_SA_TEXT_DOMAIN); ?></li>
+                <li><?php esc_html_e('Twitter Cards', HR_SA_TEXT_DOMAIN); ?>: <?php echo !empty($social_snapshot['twitter_enabled']) ? esc_html__('Enabled', HR_SA_TEXT_DOMAIN) : esc_html__('Disabled', HR_SA_TEXT_DOMAIN); ?></li>
+            </ul>
+            <?php if (!empty($social_snapshot['blocked'])) : ?>
+                <div class="notice notice-warning inline">
+                    <p><?php esc_html_e('Output suppressed because another SEO plugin is active while Conflict Mode is set to Respect.', HR_SA_TEXT_DOMAIN); ?></p>
+                </div>
+            <?php endif; ?>
+            <table class="widefat striped">
+                <tbody>
+                    <?php foreach ($field_labels as $field_key => $label) : ?>
+                        <?php $value = isset($social_fields[$field_key]) ? (string) $social_fields[$field_key] : ''; ?>
+                        <tr>
+                            <th scope="row"><?php echo esc_html($label); ?></th>
+                            <td>
+                                <?php if ($value === '') : ?>
+                                    <span class="description"><?php esc_html_e('Not available', HR_SA_TEXT_DOMAIN); ?></span>
+                                <?php elseif (in_array($field_key, ['url', 'image'], true)) : ?>
+                                    <a href="<?php echo esc_url($value); ?>" target="_blank" rel="noopener noreferrer"><code><?php echo esc_html($value); ?></code></a>
+                                <?php else : ?>
+                                    <code><?php echo esc_html($value); ?></code>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+
+            <h3><?php esc_html_e('Open Graph Tags', HR_SA_TEXT_DOMAIN); ?></h3>
+            <?php if (!empty($social_snapshot['og'])) : ?>
+                <ul class="hr-sa-meta-list">
+                    <?php foreach ($social_snapshot['og'] as $property => $value) : ?>
+                        <li><code><?php echo esc_html($property); ?></code> <code><?php echo esc_html($value); ?></code></li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php else : ?>
+                <p class="description"><?php esc_html_e('Open Graph tags are disabled or missing required values.', HR_SA_TEXT_DOMAIN); ?></p>
+            <?php endif; ?>
+
+            <h3><?php esc_html_e('Twitter Card Tags', HR_SA_TEXT_DOMAIN); ?></h3>
+            <?php if (!empty($social_snapshot['twitter'])) : ?>
+                <ul class="hr-sa-meta-list">
+                    <?php foreach ($social_snapshot['twitter'] as $name => $value) : ?>
+                        <li><code><?php echo esc_html($name); ?></code> <code><?php echo esc_html($value); ?></code></li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php else : ?>
+                <p class="description"><?php esc_html_e('Twitter Card tags are disabled or missing required values.', HR_SA_TEXT_DOMAIN); ?></p>
+            <?php endif; ?>
         </section>
 
         <section class="hr-sa-section">

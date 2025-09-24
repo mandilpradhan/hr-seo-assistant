@@ -19,6 +19,7 @@ function hr_sa_feature_flags_initialize_defaults(): void
     $defaults = [
         'hr_sa_jsonld_enabled'      => '1',
         'hr_sa_og_enabled'          => '0',
+        'hr_sa_twitter_enabled'     => '0',
         'hr_sa_debug_enabled'       => hr_sa_get_settings_defaults()['hr_sa_debug_enabled'],
         'hr_sa_respect_other_seo'   => '1',
     ];
@@ -54,7 +55,30 @@ function hr_sa_is_jsonld_enabled(): bool
 function hr_sa_is_og_enabled(): bool
 {
     $enabled = hr_sa_is_flag_enabled('hr_sa_og_enabled', false);
-    return (bool) apply_filters('hr_sa_og_enabled', $enabled);
+    $enabled = (bool) apply_filters('hr_sa_og_enabled', $enabled);
+
+    /**
+     * Filter whether Open Graph output should be enabled.
+     *
+     * @param bool $enabled
+     */
+    return (bool) apply_filters('hr_sa_enable_og', $enabled);
+}
+
+/**
+ * Whether Twitter Card emission is enabled.
+ */
+function hr_sa_is_twitter_enabled(): bool
+{
+    $enabled = hr_sa_is_flag_enabled('hr_sa_twitter_enabled', false);
+    $enabled = (bool) apply_filters('hr_sa_twitter_enabled', $enabled);
+
+    /**
+     * Filter whether Twitter Card output should be enabled.
+     *
+     * @param bool $enabled
+     */
+    return (bool) apply_filters('hr_sa_enable_twitter', $enabled);
 }
 
 /**
