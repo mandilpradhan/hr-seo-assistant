@@ -10,6 +10,33 @@
         localeSelect: '.hr-sa-locale-selector',
     };
 
+    const normalizeToHttps = (rawUrl) => {
+        if (typeof rawUrl !== 'string') {
+            return '';
+        }
+
+        const trimmed = rawUrl.trim();
+        if (trimmed === '') {
+            return '';
+        }
+
+        if (!/^https?:\/\//i.test(trimmed)) {
+            return trimmed;
+        }
+
+        try {
+            const parsed = new URL(trimmed);
+            if (parsed.protocol !== 'https:') {
+                parsed.protocol = 'https:';
+                return parsed.toString();
+            }
+
+            return parsed.toString();
+        } catch (error) {
+            return trimmed.replace(/^http:\/\//i, 'https://');
+        }
+    };
+
     let mediaFrame = null;
 
     const resetCopyButton = (button) => {
@@ -54,6 +81,30 @@
         }
     };
 
+    const copyWithClipboard = (text, onSuccess, onFailure) => {
+        const clipboard = navigator.clipboard;
+        const clipboardSupported = Boolean(clipboard && typeof clipboard.writeText === 'function');
+
+        if (!clipboardSupported || (typeof window !== 'undefined' && window.isSecureContext === false)) {
+            fallbackCopy(text, onSuccess, onFailure);
+            return;
+        }
+
+        try {
+            const result = clipboard.writeText(text);
+            if (result && typeof result.then === 'function') {
+                result.then(onSuccess).catch(() => {
+                    fallbackCopy(text, onSuccess, onFailure);
+                });
+                return;
+            }
+
+            onSuccess();
+        } catch (error) {
+            fallbackCopy(text, onSuccess, onFailure);
+        }
+    };
+
     const handleCopy = (button) => {
         const sourceId = button.getAttribute('data-source');
         if (!sourceId) {
@@ -80,14 +131,7 @@
             window.alert(__('Unable to copy. Please copy manually.', 'hr-seo-assistant'));
         };
 
-        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-            navigator.clipboard.writeText(textToCopy).then(onSuccess).catch(() => {
-                fallbackCopy(textToCopy, onSuccess, onFailure);
-            });
-            return;
-        }
-
-        fallbackCopy(textToCopy, onSuccess, onFailure);
+        copyWithClipboard(textToCopy, onSuccess, onFailure);
     };
 
     const openMediaFrame = (targetId) => {
@@ -118,7 +162,7 @@
 
             const url = attachment.get('url');
             if (typeof url === 'string') {
-                inputField.value = url;
+                inputField.value = normalizeToHttps(url);
                 inputField.dispatchEvent(new Event('change', { bubbles: true }));
             }
         });
