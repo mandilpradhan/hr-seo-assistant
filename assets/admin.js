@@ -1,4 +1,9 @@
 (() => {
+    const wpGlobal = window.wp || {};
+    const __ = wpGlobal.i18n && typeof wpGlobal.i18n.__ === 'function'
+        ? wpGlobal.i18n.__
+        : (text) => text;
+
     const selectors = {
         mediaButton: '.hr-sa-media-picker',
         copyButton: '.hr-sa-copy-json',
@@ -6,72 +11,151 @@
 
     let mediaFrame = null;
 
-    const openMediaFrame = (targetId) => {
-        if (mediaFrame) {
-            mediaFrame.off('select');
+    const resetCopyButton = (button) => {
+        window.setTimeout(() => {
+            button.removeAttribute('data-state');
+            button.textContent = __('Copy Context & Settings JSON', 'hr-seo-assistant');
+        }, 3000);
+    };
+
+    const fallbackCopy = (text, onSuccess, onFailure) => {
+        const temp = document.createElement('textarea');
+        temp.value = text;
+        temp.setAttribute('readonly', '');
+        temp.style.position = 'absolute';
+        temp.style.left = '-9999px';
+        document.body.appendChild(temp);
+
+        const selection = document.getSelection();
+        const previousRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+
+        temp.select();
+        temp.setSelectionRange(0, temp.value.length);
+
+        let copied = false;
+        try {
+            copied = document.execCommand('copy');
+        } catch (error) {
+            copied = false;
         }
 
-        mediaFrame = wp.media({
-            title: wp.i18n.__('Select fallback image', 'hr-seo-assistant'),
+        document.body.removeChild(temp);
+
+        if (selection && previousRange) {
+            selection.removeAllRanges();
+            selection.addRange(previousRange);
+        }
+
+        if (copied) {
+            onSuccess();
+        } else {
+            onFailure();
+        }
+    };
+
+    const handleCopy = (button) => {
+        const sourceId = button.getAttribute('data-source');
+        if (!sourceId) {
+            return;
+        }
+
+        const source = document.getElementById(sourceId);
+        if (!source) {
+            return;
+        }
+
+        const textToCopy = 'value' in source ? source.value : source.textContent;
+        if (!textToCopy) {
+            return;
+        }
+
+        const onSuccess = () => {
+            button.setAttribute('data-state', 'copied');
+            button.textContent = __('Copied!', 'hr-seo-assistant');
+            resetCopyButton(button);
+        };
+
+        const onFailure = () => {
+            window.alert(__('Unable to copy. Please copy manually.', 'hr-seo-assistant'));
+        };
+
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            navigator.clipboard.writeText(textToCopy).then(onSuccess).catch(() => {
+                fallbackCopy(textToCopy, onSuccess, onFailure);
+            });
+            return;
+        }
+
+        fallbackCopy(textToCopy, onSuccess, onFailure);
+    };
+
+    const openMediaFrame = (targetId) => {
+        if (!wpGlobal.media || typeof wpGlobal.media !== 'function') {
+            window.alert(__('The media library is unavailable. Please reload the page and try again.', 'hr-seo-assistant'));
+            return;
+        }
+
+        mediaFrame = wpGlobal.media({
+            title: __('Select fallback image', 'hr-seo-assistant'),
             library: { type: 'image' },
-            button: { text: wp.i18n.__('Use image', 'hr-seo-assistant') },
+            button: { text: __('Use image', 'hr-seo-assistant') },
             multiple: false,
         });
 
         mediaFrame.on('select', () => {
-            const selection = mediaFrame.state().get('selection');
-            const attachment = selection.first();
+            const inputField = document.getElementById(targetId);
+            if (!inputField) {
+                return;
+            }
+
+            const state = mediaFrame.state();
+            const selection = state && typeof state.get === 'function' ? state.get('selection') : null;
+            const attachment = selection && typeof selection.first === 'function' ? selection.first() : null;
             if (!attachment) {
                 return;
             }
 
-            const input = document.getElementById(targetId);
-            if (input) {
-                const url = attachment.get('url');
-                input.value = url || '';
-                input.dispatchEvent(new Event('change', { bubbles: true }));
+            const url = attachment.get('url');
+            if (typeof url === 'string') {
+                inputField.value = url;
+                inputField.dispatchEvent(new Event('change', { bubbles: true }));
             }
         });
 
         mediaFrame.open();
     };
 
-    const handleCopy = (button) => {
-        const json = button.getAttribute('data-json') || '';
-        if (!json) {
-            return;
-        }
-
-        navigator.clipboard.writeText(json).then(() => {
-            button.setAttribute('data-state', 'copied');
-            button.textContent = wp.i18n.__('Copied!', 'hr-seo-assistant');
-            setTimeout(() => {
-                button.removeAttribute('data-state');
-                button.textContent = wp.i18n.__('Copy Context & Settings JSON', 'hr-seo-assistant');
-            }, 3000);
-        }).catch(() => {
-            alert(wp.i18n.__('Unable to copy. Please copy manually.', 'hr-seo-assistant'));
+    const bindMediaButtons = () => {
+        const buttons = document.querySelectorAll(selectors.mediaButton);
+        buttons.forEach((button) => {
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                const targetId = button.getAttribute('data-target');
+                if (targetId) {
+                    openMediaFrame(targetId);
+                }
+            });
         });
     };
 
-    document.addEventListener('click', (event) => {
-        const target = event.target;
-        if (!(target instanceof HTMLElement)) {
-            return;
-        }
+    const bindCopyButtons = () => {
+        const buttons = document.querySelectorAll(selectors.copyButton);
+        buttons.forEach((button) => {
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                handleCopy(button);
+            });
+        });
+    };
 
-        if (target.matches(selectors.mediaButton)) {
-            event.preventDefault();
-            const targetId = target.getAttribute('data-target');
-            if (targetId) {
-                openMediaFrame(targetId);
-            }
-            return;
-        }
+    const init = () => {
+        bindMediaButtons();
+        bindCopyButtons();
+    };
 
-        if (target.matches(selectors.copyButton)) {
-            event.preventDefault();
-            handleCopy(target);
-        }
-    });
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 })();

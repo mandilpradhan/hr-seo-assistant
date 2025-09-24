@@ -27,14 +27,34 @@ function hr_sa_render_settings_page(): void
     $tpl_page      = (string) hr_sa_get_setting('hr_sa_tpl_page');
     $brand_suffix  = (bool) hr_sa_get_setting('hr_sa_tpl_page_brand_suffix');
     $locale        = (string) hr_sa_get_setting('hr_sa_locale');
+    $locale_choices = hr_sa_get_locale_choices();
+    if ($locale !== '' && !array_key_exists($locale, $locale_choices)) {
+        $locale_choices = [$locale => sprintf(__('Current (custom): %s', HR_SA_TEXT_DOMAIN), $locale)] + $locale_choices;
+    }
     $site_name     = (string) hr_sa_get_setting('hr_sa_site_name', get_bloginfo('name'));
     $twitter       = (string) hr_sa_get_setting('hr_sa_twitter_handle');
     $image_preset  = (string) get_option('hr_sa_image_preset', hr_sa_get_settings_defaults()['hr_sa_image_preset']);
     $conflict_mode = hr_sa_get_conflict_mode();
     $debug_enabled = hr_sa_is_debug_enabled();
+
+    $updated_flag = isset($_GET['settings-updated'])
+        ? sanitize_text_field(wp_unslash((string) $_GET['settings-updated']))
+        : '';
+
+    if ($updated_flag === 'true' || $updated_flag === '1') {
+        add_settings_error('hr_sa_settings', 'hr_sa_settings_saved', __('Settings saved.', HR_SA_TEXT_DOMAIN), 'updated');
+    } elseif ($updated_flag === 'false' || $updated_flag === '0') {
+        add_settings_error(
+            'hr_sa_settings',
+            'hr_sa_settings_failed',
+            __('Settings could not be saved. Please review the fields below and try again.', HR_SA_TEXT_DOMAIN),
+            'error'
+        );
+    }
     ?>
     <div class="wrap hr-sa-wrap">
         <h1><?php esc_html_e('HR SEO Settings', HR_SA_TEXT_DOMAIN); ?></h1>
+        <?php settings_errors('hr_sa_settings'); ?>
         <form method="post" action="options.php">
             <?php settings_fields('hr_sa_settings'); ?>
             <table class="form-table" role="presentation">
@@ -85,10 +105,16 @@ function hr_sa_render_settings_page(): void
                         </td>
                     </tr>
                     <tr>
-                        <th scope="row"><label for="hr_sa_locale"><?php esc_html_e('Locale', HR_SA_TEXT_DOMAIN); ?></label></th>
+                        <th scope="row"><label for="hr_sa_locale_selector"><?php esc_html_e('Locale', HR_SA_TEXT_DOMAIN); ?></label></th>
                         <td>
-                            <input type="text" id="hr_sa_locale" name="hr_sa_locale" value="<?php echo esc_attr($locale); ?>" class="regular-text" />
-                            <p class="description"><?php esc_html_e('Format: xx_XX (e.g., en_US).', HR_SA_TEXT_DOMAIN); ?></p>
+                            <select id="hr_sa_locale_selector" class="hr-sa-locale-selector" name="hr_sa_locale">
+                                <?php foreach ($locale_choices as $code => $label) : ?>
+                                    <option value="<?php echo esc_attr($code); ?>"<?php selected($locale, $code); ?>>
+                                        <?php echo esc_html($label); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <p class="description"><?php esc_html_e('Choose the locale used for generated metadata (e.g., en_US).', HR_SA_TEXT_DOMAIN); ?></p>
                         </td>
                     </tr>
                     <tr>

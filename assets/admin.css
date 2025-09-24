@@ -91,3 +91,13 @@
 .hr-sa-copy-json {
     margin-top: 10px;
 }
+
+.hr-sa-copy-source {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+}
+

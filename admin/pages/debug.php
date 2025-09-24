@@ -74,6 +74,9 @@ function hr_sa_render_debug_page(): void
         'flags'    => $flags,
     ];
     $copy_json    = wp_json_encode($copy_payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if (!is_string($copy_json) || $copy_json === '') {
+        $copy_json = '{}';
+    }
     ?>
     <div class="wrap hr-sa-wrap hr-sa-debug-wrap">
         <h1><?php esc_html_e('HR SEO Debug', HR_SA_TEXT_DOMAIN); ?></h1>
@@ -236,7 +239,8 @@ function hr_sa_render_debug_page(): void
 
         <section class="hr-sa-section">
             <h2><?php esc_html_e('Export', HR_SA_TEXT_DOMAIN); ?></h2>
-            <button type="button" class="button button-primary hr-sa-copy-json" data-json="<?php echo esc_attr($copy_json ?: '{}'); ?>">
+            <textarea id="hr_sa_copy_payload" class="hr-sa-copy-source" readonly aria-hidden="true" tabindex="-1" hidden><?php echo esc_textarea($copy_json); ?></textarea>
+            <button type="button" class="button button-primary hr-sa-copy-json" data-source="hr_sa_copy_payload">
                 <?php esc_html_e('Copy Context & Settings JSON', HR_SA_TEXT_DOMAIN); ?>
             </button>
             <p class="description"><?php esc_html_e('Copies context, settings, and flags to the clipboard for support.', HR_SA_TEXT_DOMAIN); ?></p>
