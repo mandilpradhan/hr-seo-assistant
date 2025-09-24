@@ -21,6 +21,8 @@ function hr_sa_render_settings_page(): void
     }
 
     $fallback      = (string) hr_sa_get_setting('hr_sa_fallback_image', '');
+    $og_enabled    = hr_sa_is_flag_enabled('hr_sa_og_enabled', false);
+    $twitter_cards = hr_sa_is_flag_enabled('hr_sa_twitter_enabled', false);
     $tpl_trip      = (string) hr_sa_get_setting('hr_sa_tpl_trip');
     $tpl_page      = (string) hr_sa_get_setting('hr_sa_tpl_page');
     $brand_suffix  = (bool) hr_sa_get_setting('hr_sa_tpl_page_brand_suffix');
@@ -45,6 +47,24 @@ function hr_sa_render_settings_page(): void
                                 <button type="button" class="button hr-sa-media-picker" data-target="hr_sa_fallback_image"><?php esc_html_e('Choose Image', HR_SA_TEXT_DOMAIN); ?></button>
                             </div>
                             <p class="description"><?php esc_html_e('Used when no hero image is provided. Must be an absolute HTTPS URL.', HR_SA_TEXT_DOMAIN); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Social Metadata', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td>
+                            <fieldset>
+                                <legend class="screen-reader-text"><?php esc_html_e('Social Metadata Toggles', HR_SA_TEXT_DOMAIN); ?></legend>
+                                <label for="hr_sa_og_enabled">
+                                    <input type="checkbox" id="hr_sa_og_enabled" name="hr_sa_og_enabled" value="1" <?php checked($og_enabled); ?> />
+                                    <?php esc_html_e('Enable Open Graph tags', HR_SA_TEXT_DOMAIN); ?>
+                                </label>
+                                <br />
+                                <label for="hr_sa_twitter_enabled">
+                                    <input type="checkbox" id="hr_sa_twitter_enabled" name="hr_sa_twitter_enabled" value="1" <?php checked($twitter_cards); ?> />
+                                    <?php esc_html_e('Enable Twitter Card tags', HR_SA_TEXT_DOMAIN); ?>
+                                </label>
+                                <p class="description"><?php esc_html_e('Twitter Cards reuse Open Graph data and require a large hero image or fallback.', HR_SA_TEXT_DOMAIN); ?></p>
+                            </fieldset>
                         </td>
                     </tr>
                     <tr>

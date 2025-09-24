@@ -27,9 +27,14 @@ function hr_sa_render_modules_page(): void
             'enabled'     => hr_sa_is_jsonld_enabled(),
         ],
         [
-            'name'        => __('OG/Twitter Module', HR_SA_TEXT_DOMAIN),
-            'description' => __('Open Graph and Twitter Cards (planned for Phase 1).', HR_SA_TEXT_DOMAIN),
+            'name'        => __('Open Graph Tags', HR_SA_TEXT_DOMAIN),
+            'description' => __('Generates Open Graph metadata for social sharing.', HR_SA_TEXT_DOMAIN),
             'enabled'     => hr_sa_is_og_enabled(),
+        ],
+        [
+            'name'        => __('Twitter Cards', HR_SA_TEXT_DOMAIN),
+            'description' => __('Outputs summary_large_image cards aligned with Open Graph values.', HR_SA_TEXT_DOMAIN),
+            'enabled'     => hr_sa_is_twitter_enabled(),
         ],
         [
             'name'        => __('Debug Tools', HR_SA_TEXT_DOMAIN),
