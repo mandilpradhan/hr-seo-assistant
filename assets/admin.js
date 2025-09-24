@@ -7,6 +7,7 @@
     const selectors = {
         mediaButton: '.hr-sa-media-picker',
         copyButton: '.hr-sa-copy-json',
+        localeSelect: '.hr-sa-locale-selector',
     };
 
     let mediaFrame = null;
