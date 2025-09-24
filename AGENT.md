@@ -1,3 +1,7 @@
+provide the following as a downloadable MD file. 
+
+
+📑 AGENT.md
 # HR SEO Assistant — Agent Instructions
 
 This file is for any code generation agent (Codex or similar) working on this repository.  
@@ -30,6 +34,7 @@ This scheme **must** be carried consistently across all modules.
 ---
 
 ## Repository Layout
+
 
 hr-seo-assistant/
 ├─ hr-seo-assistant.php # bootstrap
@@ -97,6 +102,4 @@ If spec is incomplete or ambiguous:
 1. Leave clear `// TODO:` or `@todo` comments.
 2. Avoid assumptions that lock future development paths.
 3. Defer OG/Twitter and AI until explicitly greenlit in roadmap.
-
----
 
