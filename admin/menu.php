@@ -16,7 +16,7 @@ require_once HR_SA_PLUGIN_DIR . 'admin/pages/settings.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/pages/modules.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/pages/debug.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/ajax/ai.php';
-require_once HR_SA_PLUGIN_DIR . 'admin/meta-boxes/ai.php';
+require_once HR_SA_PLUGIN_DIR . 'admin/meta-boxes/meta.php';
 
 add_action('admin_menu', 'hr_sa_register_admin_menu');
 add_action('admin_enqueue_scripts', 'hr_sa_enqueue_admin_assets');
