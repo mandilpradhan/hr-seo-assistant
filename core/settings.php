@@ -268,6 +268,11 @@ function hr_sa_sanitize_twitter_handle($value): string
 function hr_sa_sanitize_conflict_mode($value): string
 {
     $mode = strtolower(is_string($value) ? trim($value) : '');
+
+    if ($mode === 'block_others') {
+        $mode = 'block_og';
+    }
+
     $allowed = ['respect', 'force', 'block_og'];
     $mode = in_array($mode, $allowed, true) ? $mode : 'respect';
 
