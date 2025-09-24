@@ -25,9 +25,15 @@ define('HR_SA_PLUGIN_URL', plugin_dir_url(__FILE__));
 require_once HR_SA_PLUGIN_DIR . 'core/settings.php';
 require_once HR_SA_PLUGIN_DIR . 'core/feature-flags.php';
 require_once HR_SA_PLUGIN_DIR . 'core/context.php';
+require_once HR_SA_PLUGIN_DIR . 'core/ai.php';
 require_once HR_SA_PLUGIN_DIR . 'core/compat.php';
 require_once HR_SA_PLUGIN_DIR . 'integrations/media-help.php';
+require_once HR_SA_PLUGIN_DIR . 'admin/pages/settings.php';
+require_once HR_SA_PLUGIN_DIR . 'admin/pages/debug.php';
+require_once HR_SA_PLUGIN_DIR . 'admin/meta-boxes/ai.php';
+require_once HR_SA_PLUGIN_DIR . 'admin/ajax/ai.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/menu.php';
+require_once HR_SA_PLUGIN_DIR . 'modules/meta/seo.php';
 require_once HR_SA_PLUGIN_DIR . 'modules/jsonld/loader.php';
 require_once HR_SA_PLUGIN_DIR . 'modules/og/loader.php';
 
