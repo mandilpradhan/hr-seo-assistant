@@ -38,11 +38,29 @@ function hr_sa_render_debug_page(): void
         'twitter' => $twitter_on,
         'debug'   => hr_sa_is_debug_enabled(),
     ];
-    $hero_url     = hr_sa_get_media_help_hero_url();
-    $has_hero     = $hero_url !== null;
-    $social_image = function_exists('hr_sa_resolve_social_image_url') ? hr_sa_resolve_social_image_url($context) : null;
-    $og_tags      = $og_enabled && function_exists('hr_sa_build_og_tags') ? hr_sa_build_og_tags($context, $social_image) : [];
-    $twitter_tags = $twitter_on && function_exists('hr_sa_build_twitter_tags') ? hr_sa_build_twitter_tags($context, $social_image) : [];
+    $hero_url                 = hr_sa_get_media_help_hero_url();
+    $has_hero                 = $hero_url !== null;
+    $image_resolution         = hr_sa_get_social_image_resolution($post_id);
+    $social_image_url         = $image_resolution['url'];
+    $social_image_source      = $image_resolution['source'];
+    $social_meta_raw          = $post_id > 0 ? get_post_meta($post_id, '_hrih_header_image_url', true) : null;
+    $social_meta_display      = null;
+    $social_meta_candidate    = null;
+
+    if ($post_id > 0) {
+        $social_meta_candidate = hr_sa_extract_social_image_meta_value($social_meta_raw);
+
+        if (is_scalar($social_meta_raw)) {
+            $social_meta_display = (string) $social_meta_raw;
+        } elseif (is_array($social_meta_raw) || is_object($social_meta_raw)) {
+            $encoded = wp_json_encode($social_meta_raw, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            if (is_string($encoded)) {
+                $social_meta_display = $encoded;
+            }
+        }
+    }
+    $og_tags             = $og_enabled && function_exists('hr_sa_build_og_tags') ? hr_sa_build_og_tags($context, $social_image_url) : [];
+    $twitter_tags        = $twitter_on && function_exists('hr_sa_build_twitter_tags') ? hr_sa_build_twitter_tags($context, $social_image_url) : [];
     $og_type      = function_exists('hr_sa_resolve_og_type') ? hr_sa_resolve_og_type($context) : ($context['type'] ?? 'page');
     $other_seo    = hr_sa_other_seo_active();
     $emitters     = function_exists('hr_sa_jsonld_get_active_emitters') ? hr_sa_jsonld_get_active_emitters() : [];
@@ -132,12 +150,46 @@ function hr_sa_render_debug_page(): void
                         <td><?php echo esc_html($context['site_name']); ?></td>
                     </tr>
                     <tr>
-                        <th scope="row"><?php esc_html_e('Resolved Image', HR_SA_TEXT_DOMAIN); ?></th>
+                        <th scope="row"><?php esc_html_e('Social Image Meta (raw)', HR_SA_TEXT_DOMAIN); ?></th>
                         <td>
-                            <?php if ($social_image) : ?>
-                                <code><?php echo esc_html($social_image); ?></code>
+                            <?php if ($social_meta_display !== null) : ?>
+                                <code><?php echo esc_html($social_meta_display); ?></code>
+                            <?php elseif ($post_id > 0) : ?>
+                                <span class="description"><?php esc_html_e('Meta field empty.', HR_SA_TEXT_DOMAIN); ?></span>
                             <?php else : ?>
-                                <span class="description"><?php esc_html_e('No image resolved (hero and fallback empty).', HR_SA_TEXT_DOMAIN); ?></span>
+                                <span class="description"><?php esc_html_e('Not applicable for this view.', HR_SA_TEXT_DOMAIN); ?></span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Meta Candidate URL', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td>
+                            <?php if ($social_meta_candidate !== null) : ?>
+                                <code><?php echo esc_html($social_meta_candidate); ?></code>
+                            <?php elseif ($post_id > 0) : ?>
+                                <span class="description"><?php esc_html_e('No usable meta candidate.', HR_SA_TEXT_DOMAIN); ?></span>
+                            <?php else : ?>
+                                <span class="description"><?php esc_html_e('Not applicable for this view.', HR_SA_TEXT_DOMAIN); ?></span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Social Image Source', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td>
+                            <?php if ($social_image_source) : ?>
+                                <code><?php echo esc_html((string) $social_image_source); ?></code>
+                            <?php else : ?>
+                                <span class="description"><?php esc_html_e('No social image resolved.', HR_SA_TEXT_DOMAIN); ?></span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Social Image URL', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td>
+                            <?php if ($social_image_url) : ?>
+                                <code><?php echo esc_html($social_image_url); ?></code>
+                            <?php else : ?>
+                                <span class="description"><?php esc_html_e('No image resolved (meta and fallback empty).', HR_SA_TEXT_DOMAIN); ?></span>
                             <?php endif; ?>
                         </td>
                     </tr>

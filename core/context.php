@@ -106,6 +106,139 @@ function hr_sa_context_prepare_fallback_image(): string
 }
 
 /**
+ * Resolve an attachment ID to its URL if possible.
+ *
+ * @return string|null
+ */
+function hr_sa_resolve_attachment_image_url(int $attachment_id): ?string
+{
+    if ($attachment_id <= 0 || !function_exists('wp_get_attachment_url')) {
+        return null;
+    }
+
+    $url = wp_get_attachment_url($attachment_id);
+
+    if (!is_string($url) || $url === '') {
+        return null;
+    }
+
+    return $url;
+}
+
+/**
+ * Extract a raw social image candidate from stored meta.
+ *
+ * @param mixed $value Raw meta value.
+ *
+ * @return string|null
+ */
+function hr_sa_extract_social_image_meta_value($value): ?string
+{
+    if (is_string($value)) {
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return null;
+        }
+
+        if (ctype_digit($trimmed)) {
+            $attachment_url = hr_sa_resolve_attachment_image_url((int) $trimmed);
+            if ($attachment_url !== null) {
+                return $attachment_url;
+            }
+        }
+
+        return $trimmed;
+    }
+
+    if (is_int($value)) {
+        return hr_sa_resolve_attachment_image_url($value);
+    }
+
+    if (is_array($value)) {
+        $candidates = [];
+        $keys       = ['url', 'src', 'source', 'cdn_url', 'raw', 'value'];
+
+        foreach ($keys as $key) {
+            if (isset($value[$key]) && is_string($value[$key])) {
+                $candidate = trim($value[$key]);
+                if ($candidate === '') {
+                    continue;
+                }
+
+                if (ctype_digit($candidate)) {
+                    $attachment_url = hr_sa_resolve_attachment_image_url((int) $candidate);
+                    if ($attachment_url !== null) {
+                        return $attachment_url;
+                    }
+                }
+
+                $candidates[] = $candidate;
+            }
+        }
+
+        foreach ($value as $maybe_value) {
+            if (is_string($maybe_value)) {
+                $candidate = trim($maybe_value);
+                if ($candidate === '') {
+                    continue;
+                }
+
+                if (ctype_digit($candidate)) {
+                    $attachment_url = hr_sa_resolve_attachment_image_url((int) $candidate);
+                    if ($attachment_url !== null) {
+                        return $attachment_url;
+                    }
+                }
+
+                $candidates[] = $candidate;
+            } elseif (is_numeric($maybe_value)) {
+                $attachment_url = hr_sa_resolve_attachment_image_url((int) $maybe_value);
+                if ($attachment_url !== null) {
+                    return $attachment_url;
+                }
+            }
+        }
+
+        if ($candidates !== []) {
+            return $candidates[0];
+        }
+
+        return null;
+    }
+
+    if (is_object($value)) {
+        $properties = ['url', 'src', 'source', 'cdn_url', 'raw', 'value'];
+        foreach ($properties as $property) {
+            if (isset($value->{$property}) && is_string($value->{$property})) {
+                $candidate = trim($value->{$property});
+                if ($candidate === '') {
+                    continue;
+                }
+
+                if (ctype_digit($candidate)) {
+                    $attachment_url = hr_sa_resolve_attachment_image_url((int) $candidate);
+                    if ($attachment_url !== null) {
+                        return $attachment_url;
+                    }
+                }
+
+                return $candidate;
+            }
+        }
+
+        if (isset($value->ID) && is_numeric($value->ID)) {
+            return hr_sa_resolve_attachment_image_url((int) $value->ID);
+        }
+
+        if (isset($value->id) && is_numeric($value->id)) {
+            return hr_sa_resolve_attachment_image_url((int) $value->id);
+        }
+    }
+
+    return null;
+}
+
+/**
  * Build a context-aware title string.
  */
 function hr_sa_context_build_title(string $type, ?\WP_Post $post, string $site_name): string
@@ -302,4 +435,196 @@ function hr_sa_context_normalize_description(string $value, int $max_chars = 280
     $slice = rtrim($slice, " \t\n\r\0\x0B,;:-");
 
     return $slice . '…';
+}
+
+/**
+ * Apply the configured CDN preset to an image URL.
+ *
+ * @param string $url Base image URL.
+ *
+ * @return string
+ */
+function hr_sa_apply_image_preset(string $url): string
+{
+    $preset = trim((string) hr_sa_get_image_preset());
+    if ($preset === '') {
+        return $url;
+    }
+
+    $parts = array_filter(array_map('trim', explode(',', $preset)));
+    if (!$parts) {
+        return $url;
+    }
+
+    $args = [];
+    foreach ($parts as $part) {
+        if (strpos($part, '=') === false) {
+            continue;
+        }
+
+        [$key, $value] = array_map('trim', explode('=', $part, 2));
+        if ($key === '') {
+            continue;
+        }
+
+        $args[$key] = $value;
+    }
+
+    if ($args === []) {
+        return $url;
+    }
+
+    return add_query_arg($args, $url);
+}
+
+/**
+ * Validate an absolute HTTPS image URL.
+ *
+ * @return string|null
+ */
+function hr_sa_normalize_https_url(string $url): ?string
+{
+    if ($url === '') {
+        return null;
+    }
+
+    if (strpos($url, '//') === 0) {
+        $url = 'https:' . $url;
+    }
+
+    $sanitized = esc_url_raw($url);
+    if ($sanitized === '') {
+        return null;
+    }
+
+    if (!wp_http_validate_url($sanitized)) {
+        return null;
+    }
+
+    $parts = wp_parse_url($sanitized);
+    if (!$parts || empty($parts['host'])) {
+        return null;
+    }
+
+    $scheme = isset($parts['scheme']) ? strtolower((string) $parts['scheme']) : '';
+    if ($scheme !== 'https') {
+        return null;
+    }
+
+    return $sanitized;
+}
+
+/**
+ * Normalize a candidate social image URL.
+ *
+ * @param mixed $value Raw candidate value.
+ */
+function hr_sa_normalize_social_image_candidate($value): ?string
+{
+    if (!is_string($value)) {
+        return null;
+    }
+
+    $value = trim($value);
+    if ($value === '') {
+        return null;
+    }
+
+    $url = hr_sa_normalize_https_url($value);
+    if ($url === null) {
+        return null;
+    }
+
+    $url = hr_sa_apply_image_preset($url);
+
+    return hr_sa_normalize_https_url($url);
+}
+
+/**
+ * Resolve the social image URL and data for a given post.
+ *
+ * @return array{url: ?string, source: ?string}
+ */
+function hr_sa_get_social_image_resolution(int $post_id): array
+{
+    $url    = null;
+    $source = null;
+
+    if ($post_id > 0) {
+        $meta_value = get_post_meta($post_id, '_hrih_header_image_url', true);
+        $candidate  = hr_sa_extract_social_image_meta_value($meta_value);
+        if ($candidate !== null) {
+            $normalized = hr_sa_normalize_social_image_candidate($candidate);
+            if ($normalized !== null) {
+                $url    = $normalized;
+                $source = 'meta';
+            }
+        }
+    }
+
+    if ($url === null) {
+        $fallback = hr_sa_context_prepare_fallback_image();
+        $fallback = (string) apply_filters('hr_mh_site_fallback_image', $fallback);
+        $normalized = hr_sa_normalize_social_image_candidate($fallback);
+        if ($normalized !== null) {
+            $url    = $normalized;
+            $source = 'fallback';
+        }
+    }
+
+    if ($url !== null) {
+        /**
+         * Filter the resolved social image URL prior to output.
+         *
+         * @param string $url    Social image URL after normalization.
+         * @param array{post_id: int, source: ?string} $data Additional context about the resolution.
+         */
+        $filtered = apply_filters('hr_sa_social_image_url', $url, [
+            'post_id' => $post_id,
+            'source'  => $source,
+        ]);
+
+        if (is_string($filtered) && $filtered !== '') {
+            $filtered = esc_url_raw($filtered);
+            if ($filtered !== '' && wp_http_validate_url($filtered)) {
+                $parts = wp_parse_url($filtered);
+                if ($parts && !empty($parts['scheme']) && !empty($parts['host']) && strtolower((string) $parts['scheme']) === 'https') {
+                    $url = $filtered;
+                } else {
+                    $url    = null;
+                    $source = null;
+                }
+            } else {
+                $url    = null;
+                $source = null;
+            }
+        } elseif ($filtered === '') {
+            $url    = null;
+            $source = null;
+        }
+    }
+
+    if ($url === null) {
+        return [
+            'url'    => null,
+            'source' => null,
+        ];
+    }
+
+    return [
+        'url'    => $url,
+        'source' => $source,
+    ];
+}
+
+/**
+ * Resolve the final social image URL for a given post.
+ *
+ * @return string|null
+ */
+function hr_sa_resolve_social_image_url(int $post_id): ?string
+{
+    $resolution = hr_sa_get_social_image_resolution($post_id);
+
+    return $resolution['url'];
 }
