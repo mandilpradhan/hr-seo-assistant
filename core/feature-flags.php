@@ -101,6 +101,11 @@ function hr_sa_get_conflict_mode(): string
     $allowed = ['respect', 'force', 'block_og'];
     $mode    = in_array($mode, $allowed, true) ? $mode : 'respect';
 
+    /**
+     * Allow integrations to adjust the resolved conflict mode.
+     *
+     * @param string $mode
+     */
     return (string) apply_filters('hr_sa_conflict_mode', $mode);
 }
 

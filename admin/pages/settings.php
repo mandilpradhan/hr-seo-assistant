@@ -184,7 +184,7 @@ function hr_sa_render_settings_page(): void
                                     <?php esc_html_e('Block other OG insertions', HR_SA_TEXT_DOMAIN); ?>
                                 </label>
                                 <p class="description"><?php esc_html_e('Respect mode will defer JSON-LD when another SEO plugin is detected.', HR_SA_TEXT_DOMAIN); ?></p>
-                                <p class="description"><?php esc_html_e('Block mode removes third-party Open Graph tags to avoid duplicates.', HR_SA_TEXT_DOMAIN); ?></p>
+                                <p class="description"><?php esc_html_e("Block mode removes other plugins' OG/Twitter meta so HR SEO Assistant is the single source of truth.", HR_SA_TEXT_DOMAIN); ?></p>
                             </fieldset>
                         </td>
                     </tr>
