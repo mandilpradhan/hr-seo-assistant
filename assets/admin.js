@@ -8,9 +8,59 @@
         mediaButton: '.hr-sa-media-picker',
         copyButton: '.hr-sa-copy-json',
         localeSelect: '.hr-sa-locale-selector',
+        fallbackInput: '#hr_sa_fallback_image',
     };
 
-    let mediaFrame = null;
+    const normalizeToHttps = (rawUrl) => {
+        if (typeof rawUrl !== 'string') {
+            return '';
+        }
+
+        const trimmed = rawUrl.trim();
+        if (trimmed === '') {
+            return '';
+        }
+
+        if (/^https:\/\//i.test(trimmed)) {
+            return trimmed;
+        }
+
+        if (/^http:\/\//i.test(trimmed)) {
+            return trimmed.replace(/^http:\/\//i, 'https://');
+        }
+
+        if (/^\/\//.test(trimmed)) {
+            return "https:" + trimmed;
+        }
+
+        return trimmed;
+    };
+
+    const updateFieldValue = (field, newValue, shouldDispatch) => {
+        if (!field || typeof field.value === 'undefined') {
+            return;
+        }
+
+        if (typeof newValue !== 'string') {
+            return;
+        }
+
+        if (field.value === newValue) {
+            return;
+        }
+
+        field.value = newValue;
+
+        if (shouldDispatch) {
+            try {
+                field.dispatchEvent(new Event('change', { bubbles: true }));
+            } catch (error) {
+                const changeEvent = document.createEvent('HTMLEvents');
+                changeEvent.initEvent('change', true, false);
+                field.dispatchEvent(changeEvent);
+            }
+        }
+    };
 
     const resetCopyButton = (button) => {
         window.setTimeout(() => {
@@ -25,6 +75,8 @@
         temp.setAttribute('readonly', '');
         temp.style.position = 'absolute';
         temp.style.left = '-9999px';
+        temp.style.top = '0';
+        temp.style.opacity = '0';
         document.body.appendChild(temp);
 
         const selection = document.getSelection();
@@ -40,7 +92,9 @@
             copied = false;
         }
 
-        document.body.removeChild(temp);
+        if (temp.parentNode) {
+            temp.parentNode.removeChild(temp);
+        }
 
         if (selection && previousRange) {
             selection.removeAllRanges();
@@ -54,6 +108,33 @@
         }
     };
 
+    const copyWithClipboard = (text, onSuccess, onFailure) => {
+        const clipboard = navigator.clipboard;
+        const clipboardSupported = Boolean(clipboard && typeof clipboard.writeText === 'function');
+
+        if (!clipboardSupported) {
+            fallbackCopy(text, onSuccess, onFailure);
+            return;
+        }
+
+        let writeResult;
+        try {
+            writeResult = clipboard.writeText(text);
+        } catch (error) {
+            fallbackCopy(text, onSuccess, onFailure);
+            return;
+        }
+
+        if (!writeResult || typeof writeResult.then !== 'function') {
+            onSuccess();
+            return;
+        }
+
+        writeResult.then(onSuccess).catch(() => {
+            fallbackCopy(text, onSuccess, onFailure);
+        });
+    };
+
     const handleCopy = (button) => {
         const sourceId = button.getAttribute('data-source');
         if (!sourceId) {
@@ -65,8 +146,11 @@
             return;
         }
 
-        const textToCopy = 'value' in source ? source.value : source.textContent;
-        if (!textToCopy) {
+        const textToCopy = typeof source.value === 'string' && source.value !== ''
+            ? source.value
+            : source.textContent;
+
+        if (typeof textToCopy !== 'string' || textToCopy === '') {
             return;
         }
 
@@ -80,14 +164,7 @@
             window.alert(__('Unable to copy. Please copy manually.', 'hr-seo-assistant'));
         };
 
-        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-            navigator.clipboard.writeText(textToCopy).then(onSuccess).catch(() => {
-                fallbackCopy(textToCopy, onSuccess, onFailure);
-            });
-            return;
-        }
-
-        fallbackCopy(textToCopy, onSuccess, onFailure);
+        copyWithClipboard(textToCopy, onSuccess, onFailure);
     };
 
     const openMediaFrame = (targetId) => {
@@ -96,39 +173,58 @@
             return;
         }
 
-        mediaFrame = wpGlobal.media({
+        const frame = wpGlobal.media({
             title: __('Select fallback image', 'hr-seo-assistant'),
             library: { type: 'image' },
             button: { text: __('Use image', 'hr-seo-assistant') },
             multiple: false,
         });
 
-        mediaFrame.on('select', () => {
+        frame.on('select', () => {
             const inputField = document.getElementById(targetId);
             if (!inputField) {
                 return;
             }
 
-            const state = mediaFrame.state();
+            const state = typeof frame.state === 'function' ? frame.state() : null;
             const selection = state && typeof state.get === 'function' ? state.get('selection') : null;
-            const attachment = selection && typeof selection.first === 'function' ? selection.first() : null;
-            if (!attachment) {
+            const attachmentModel = selection && typeof selection.first === 'function' ? selection.first() : null;
+
+            let url = '';
+            if (attachmentModel && typeof attachmentModel.get === 'function') {
+                url = attachmentModel.get('url') || '';
+            }
+
+            if (!url && attachmentModel && typeof attachmentModel.toJSON === 'function') {
+                const attachmentData = attachmentModel.toJSON();
+                if (attachmentData && typeof attachmentData.url === 'string') {
+                    url = attachmentData.url;
+                }
+            }
+
+            if (typeof url !== 'string' || url === '') {
                 return;
             }
 
-            const url = attachment.get('url');
-            if (typeof url === 'string') {
-                inputField.value = url;
-                inputField.dispatchEvent(new Event('change', { bubbles: true }));
-            }
+            const normalized = normalizeToHttps(url);
+            updateFieldValue(inputField, normalized, true);
         });
 
-        mediaFrame.open();
+        frame.open();
     };
 
     const bindMediaButtons = () => {
         const buttons = document.querySelectorAll(selectors.mediaButton);
-        buttons.forEach((button) => {
+        if (!buttons || buttons.length === 0) {
+            return;
+        }
+
+        for (let index = 0; index < buttons.length; index += 1) {
+            const button = buttons[index];
+            if (!button) {
+                continue;
+            }
+
             button.addEventListener('click', (event) => {
                 event.preventDefault();
                 const targetId = button.getAttribute('data-target');
@@ -136,22 +232,49 @@
                     openMediaFrame(targetId);
                 }
             });
-        });
+        }
     };
 
     const bindCopyButtons = () => {
         const buttons = document.querySelectorAll(selectors.copyButton);
-        buttons.forEach((button) => {
+        if (!buttons || buttons.length === 0) {
+            return;
+        }
+
+        for (let index = 0; index < buttons.length; index += 1) {
+            const button = buttons[index];
+            if (!button) {
+                continue;
+            }
+
             button.addEventListener('click', (event) => {
                 event.preventDefault();
                 handleCopy(button);
             });
-        });
+        }
+    };
+
+    const bindFallbackNormalization = () => {
+        const field = document.querySelector(selectors.fallbackInput);
+        if (!field) {
+            return;
+        }
+
+        const normalizeField = () => {
+            const normalized = normalizeToHttps(field.value);
+            updateFieldValue(field, normalized, false);
+        };
+
+        normalizeField();
+
+        field.addEventListener('blur', normalizeField);
+        field.addEventListener('change', normalizeField);
     };
 
     const init = () => {
         bindMediaButtons();
         bindCopyButtons();
+        bindFallbackNormalization();
     };
 
     if (document.readyState === 'loading') {
