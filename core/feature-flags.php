@@ -128,14 +128,6 @@ function hr_sa_conflict_mode_is(string $mode): bool
 }
 
 /**
- * Whether other plugins' OG injections should be unhooked.
- */
-function hr_sa_should_block_external_og(): bool
-{
-    return hr_sa_conflict_mode_is('block_og');
-}
-
-/**
  * Whether other SEO plugins should be respected (i.e., skip emission).
  */
 function hr_sa_should_respect_other_seo(): bool
