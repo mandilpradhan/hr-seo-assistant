@@ -8,6 +8,7 @@
         mediaButton: '.hr-sa-media-picker',
         copyButton: '.hr-sa-copy-json',
         localeSelect: '.hr-sa-locale-selector',
+        fallbackInput: '#hr_sa_fallback_image',
     };
 
     const normalizeToHttps = (rawUrl) => {
@@ -20,24 +21,46 @@
             return '';
         }
 
-        if (!/^https?:\/\//i.test(trimmed)) {
+        if (/^https:\/\//i.test(trimmed)) {
             return trimmed;
         }
 
-        try {
-            const parsed = new URL(trimmed);
-            if (parsed.protocol !== 'https:') {
-                parsed.protocol = 'https:';
-                return parsed.toString();
-            }
-
-            return parsed.toString();
-        } catch (error) {
+        if (/^http:\/\//i.test(trimmed)) {
             return trimmed.replace(/^http:\/\//i, 'https://');
         }
+
+        if (/^\/\//.test(trimmed)) {
+            return "https:" + trimmed;
+        }
+
+        return trimmed;
     };
 
-    let mediaFrame = null;
+    const updateFieldValue = (field, newValue, shouldDispatch) => {
+        if (!field || typeof field.value === 'undefined') {
+            return;
+        }
+
+        if (typeof newValue !== 'string') {
+            return;
+        }
+
+        if (field.value === newValue) {
+            return;
+        }
+
+        field.value = newValue;
+
+        if (shouldDispatch) {
+            try {
+                field.dispatchEvent(new Event('change', { bubbles: true }));
+            } catch (error) {
+                const changeEvent = document.createEvent('HTMLEvents');
+                changeEvent.initEvent('change', true, false);
+                field.dispatchEvent(changeEvent);
+            }
+        }
+    };
 
     const resetCopyButton = (button) => {
         window.setTimeout(() => {
@@ -52,6 +75,8 @@
         temp.setAttribute('readonly', '');
         temp.style.position = 'absolute';
         temp.style.left = '-9999px';
+        temp.style.top = '0';
+        temp.style.opacity = '0';
         document.body.appendChild(temp);
 
         const selection = document.getSelection();
@@ -67,7 +92,9 @@
             copied = false;
         }
 
-        document.body.removeChild(temp);
+        if (temp.parentNode) {
+            temp.parentNode.removeChild(temp);
+        }
 
         if (selection && previousRange) {
             selection.removeAllRanges();
@@ -85,24 +112,27 @@
         const clipboard = navigator.clipboard;
         const clipboardSupported = Boolean(clipboard && typeof clipboard.writeText === 'function');
 
-        if (!clipboardSupported || (typeof window !== 'undefined' && window.isSecureContext === false)) {
+        if (!clipboardSupported) {
             fallbackCopy(text, onSuccess, onFailure);
             return;
         }
 
+        let writeResult;
         try {
-            const result = clipboard.writeText(text);
-            if (result && typeof result.then === 'function') {
-                result.then(onSuccess).catch(() => {
-                    fallbackCopy(text, onSuccess, onFailure);
-                });
-                return;
-            }
-
-            onSuccess();
+            writeResult = clipboard.writeText(text);
         } catch (error) {
             fallbackCopy(text, onSuccess, onFailure);
+            return;
         }
+
+        if (!writeResult || typeof writeResult.then !== 'function') {
+            onSuccess();
+            return;
+        }
+
+        writeResult.then(onSuccess).catch(() => {
+            fallbackCopy(text, onSuccess, onFailure);
+        });
     };
 
     const handleCopy = (button) => {
@@ -116,8 +146,11 @@
             return;
         }
 
-        const textToCopy = 'value' in source ? source.value : source.textContent;
-        if (!textToCopy) {
+        const textToCopy = typeof source.value === 'string' && source.value !== ''
+            ? source.value
+            : source.textContent;
+
+        if (typeof textToCopy !== 'string' || textToCopy === '') {
             return;
         }
 
@@ -140,39 +173,58 @@
             return;
         }
 
-        mediaFrame = wpGlobal.media({
+        const frame = wpGlobal.media({
             title: __('Select fallback image', 'hr-seo-assistant'),
             library: { type: 'image' },
             button: { text: __('Use image', 'hr-seo-assistant') },
             multiple: false,
         });
 
-        mediaFrame.on('select', () => {
+        frame.on('select', () => {
             const inputField = document.getElementById(targetId);
             if (!inputField) {
                 return;
             }
 
-            const state = mediaFrame.state();
+            const state = typeof frame.state === 'function' ? frame.state() : null;
             const selection = state && typeof state.get === 'function' ? state.get('selection') : null;
-            const attachment = selection && typeof selection.first === 'function' ? selection.first() : null;
-            if (!attachment) {
+            const attachmentModel = selection && typeof selection.first === 'function' ? selection.first() : null;
+
+            let url = '';
+            if (attachmentModel && typeof attachmentModel.get === 'function') {
+                url = attachmentModel.get('url') || '';
+            }
+
+            if (!url && attachmentModel && typeof attachmentModel.toJSON === 'function') {
+                const attachmentData = attachmentModel.toJSON();
+                if (attachmentData && typeof attachmentData.url === 'string') {
+                    url = attachmentData.url;
+                }
+            }
+
+            if (typeof url !== 'string' || url === '') {
                 return;
             }
 
-            const url = attachment.get('url');
-            if (typeof url === 'string') {
-                inputField.value = normalizeToHttps(url);
-                inputField.dispatchEvent(new Event('change', { bubbles: true }));
-            }
+            const normalized = normalizeToHttps(url);
+            updateFieldValue(inputField, normalized, true);
         });
 
-        mediaFrame.open();
+        frame.open();
     };
 
     const bindMediaButtons = () => {
         const buttons = document.querySelectorAll(selectors.mediaButton);
-        buttons.forEach((button) => {
+        if (!buttons || buttons.length === 0) {
+            return;
+        }
+
+        for (let index = 0; index < buttons.length; index += 1) {
+            const button = buttons[index];
+            if (!button) {
+                continue;
+            }
+
             button.addEventListener('click', (event) => {
                 event.preventDefault();
                 const targetId = button.getAttribute('data-target');
@@ -180,22 +232,49 @@
                     openMediaFrame(targetId);
                 }
             });
-        });
+        }
     };
 
     const bindCopyButtons = () => {
         const buttons = document.querySelectorAll(selectors.copyButton);
-        buttons.forEach((button) => {
+        if (!buttons || buttons.length === 0) {
+            return;
+        }
+
+        for (let index = 0; index < buttons.length; index += 1) {
+            const button = buttons[index];
+            if (!button) {
+                continue;
+            }
+
             button.addEventListener('click', (event) => {
                 event.preventDefault();
                 handleCopy(button);
             });
-        });
+        }
+    };
+
+    const bindFallbackNormalization = () => {
+        const field = document.querySelector(selectors.fallbackInput);
+        if (!field) {
+            return;
+        }
+
+        const normalizeField = () => {
+            const normalized = normalizeToHttps(field.value);
+            updateFieldValue(field, normalized, false);
+        };
+
+        normalizeField();
+
+        field.addEventListener('blur', normalizeField);
+        field.addEventListener('change', normalizeField);
     };
 
     const init = () => {
         bindMediaButtons();
         bindCopyButtons();
+        bindFallbackNormalization();
     };
 
     if (document.readyState === 'loading') {
