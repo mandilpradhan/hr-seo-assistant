@@ -43,6 +43,36 @@
     color: #842029;
 }
 
+.hr-sa-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    font-weight: 600;
+    padding: 2px 10px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.hr-sa-chip--success {
+    background: #e7f7ed;
+    color: #1a7f37;
+}
+
+.hr-sa-chip--neutral {
+    background: #ececec;
+    color: #444;
+}
+
+.hr-sa-chip--warning {
+    background: #fff4e5;
+    color: #a15c07;
+}
+
+.hr-sa-chip--info {
+    background: #e1ecff;
+    color: #1d4ed8;
+}
+
 .hr-sa-conflict-note {
     margin-top: 20px;
 }
@@ -167,5 +197,95 @@
 
 .hr-sa-ai-warning {
     margin-top: 12px;
+}
+
+.hr-sa-ai-status {
+    margin: 0 0 10px;
+}
+
+.hr-sa-ai-field--instruction {
+    margin-bottom: 16px;
+}
+
+.hr-sa-ai-field--instruction textarea {
+    min-height: 120px;
+}
+
+.hr-sa-modules-table th {
+    width: 45%;
+}
+
+.hr-sa-modules-table td {
+    vertical-align: middle;
+}
+
+.hr-sa-modules-table .hr-sa-module-name {
+    font-weight: 600;
+}
+
+.hr-sa-modules-actions .button {
+    margin-right: 8px;
+}
+
+.hr-sa-switch {
+    position: relative;
+    display: inline-block;
+    width: 42px;
+    height: 22px;
+}
+
+.hr-sa-switch input {
+    display: none;
+}
+
+.hr-sa-switch__slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #d1d5db;
+    border-radius: 999px;
+    transition: background-color 0.2s ease;
+}
+
+.hr-sa-switch__slider::before {
+    content: '';
+    position: absolute;
+    height: 18px;
+    width: 18px;
+    left: 2px;
+    top: 2px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s ease;
+}
+
+.hr-sa-switch input:checked + .hr-sa-switch__slider {
+    background-color: #2563eb;
+}
+
+.hr-sa-switch input:checked + .hr-sa-switch__slider::before {
+    transform: translateX(20px);
+}
+
+.hr-sa-switch input:disabled + .hr-sa-switch__slider {
+    background-color: #e5e7eb;
+    cursor: not-allowed;
+}
+
+.hr-sa-social-meta-box .hr-sa-social-field {
+    margin-bottom: 16px;
+}
+
+.hr-sa-social-meta-box .hr-sa-social-field label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.hr-sa-social-meta-box .description {
+    margin-top: 4px;
 }
 

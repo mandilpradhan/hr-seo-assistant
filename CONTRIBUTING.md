@@ -15,6 +15,8 @@ This document outlines workflow, coding conventions, hook prefixes, and release 
 - `hr_sa_image_preset` (filter): CDN preset string
 - `hr_sa_conflict_mode` (filter): `'respect' | 'force'`
 - `hr_sa_debug_enabled` (filter): bool
+- `hr_sa_social_image_url` (filter): resolved OG image array
+- `hr_sa_social_description` (filter): resolved social description string
 - `hr_mh_current_hero_url` (filter): base hero URL | null
 - `hr_mh_site_fallback_image` (filter): fallback image URL
 
@@ -92,8 +94,8 @@ fix: sanitize fallback image URL
 
 ## Non-Goals
 - Do not fold unrelated plugins (e.g., ACF Autofiller, Trips Widget).
-- Do not implement OG/Twitter until Phase 1 is explicitly greenlit.
-- Do not implement AI integrations until Phase 2 is greenlit.
+- Do not bypass Conflict Mode or emit social tags outside the resolver/module flow.
+- Do not expose AI integrations outside admin contexts or without explicit toggles.
 - Do not implement sitemaps, redirects, or robots.txt editing unless added to roadmap.
 
 ---

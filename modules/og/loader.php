@@ -182,6 +182,14 @@ function hr_sa_get_social_tag_snapshot(): array
 function hr_sa_collect_social_tag_data(): array
 {
     $context = hr_sa_get_context();
+    $post_id = is_singular() ? (int) get_queried_object_id() : 0;
+    $image_data = hr_sa_resolve_social_image_url($post_id);
+    $description = hr_sa_resolve_social_description($post_id, $context);
+
+    if ($image_data['url'] !== '') {
+        $context['image'] = $image_data['url'];
+    }
+    $context['description'] = $description;
 
     $blocked         = hr_sa_should_respect_other_seo() && hr_sa_other_seo_active();
     $og_enabled      = !$blocked && hr_sa_is_og_enabled();
@@ -192,9 +200,10 @@ function hr_sa_collect_social_tag_data(): array
 
     $fields = [
         'title'          => (string) ($context['title'] ?? ''),
-        'description'    => (string) ($context['description'] ?? ''),
+        'description'    => $description,
         'url'            => (string) ($context['url'] ?? ''),
-        'image'          => (string) ($context['image'] ?? ($context['hero_url'] ?? '')),
+        'image'          => $image_data['url'] !== '' ? $image_data['url'] : (string) ($context['image'] ?? ($context['hero_url'] ?? '')),
+        'image_source'   => $image_data['source'],
         'site_name'      => (string) ($context['site_name'] ?? ''),
         'locale'         => (string) ($context['locale'] ?? ''),
         'twitter_handle' => (string) ($context['twitter_handle'] ?? ''),

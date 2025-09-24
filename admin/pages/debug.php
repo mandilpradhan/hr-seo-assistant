@@ -37,10 +37,10 @@ function hr_sa_render_debug_page(): void
     ];
     $conflict_label = $conflict_labels[$conflict] ?? ucfirst($conflict);
     $flags        = [
-        'jsonld'  => hr_sa_is_jsonld_enabled(),
-        'og'      => hr_sa_is_og_enabled(),
-        'twitter' => hr_sa_is_twitter_enabled(),
-        'debug'   => hr_sa_is_debug_enabled(),
+        'jsonld' => hr_sa_is_jsonld_enabled(),
+        'social' => hr_sa_is_og_enabled(),
+        'ai'     => !empty($ai_snapshot['hr_sa_ai_enabled']),
+        'debug'  => hr_sa_is_debug_enabled(),
     ];
     $hero_url     = hr_sa_get_media_help_hero_url();
     $has_hero     = $hero_url !== null;
@@ -63,6 +63,7 @@ function hr_sa_render_debug_page(): void
                 'description'    => '',
                 'url'            => '',
                 'image'          => '',
+                'image_source'   => 'disabled',
                 'site_name'      => '',
                 'locale'         => '',
                 'twitter_handle' => '',
@@ -74,6 +75,7 @@ function hr_sa_render_debug_page(): void
         'description'    => __('Description', HR_SA_TEXT_DOMAIN),
         'url'            => __('URL', HR_SA_TEXT_DOMAIN),
         'image'          => __('Image', HR_SA_TEXT_DOMAIN),
+        'image_source'   => __('Image Source', HR_SA_TEXT_DOMAIN),
         'site_name'      => __('Site Name', HR_SA_TEXT_DOMAIN),
         'locale'         => __('Locale', HR_SA_TEXT_DOMAIN),
         'twitter_handle' => __('Twitter Handle', HR_SA_TEXT_DOMAIN),
@@ -124,9 +126,9 @@ function hr_sa_render_debug_page(): void
                         <td>
                             <ul>
                                 <li><?php esc_html_e('JSON-LD', HR_SA_TEXT_DOMAIN); ?>: <?php echo $flags['jsonld'] ? esc_html__('On', HR_SA_TEXT_DOMAIN) : esc_html__('Off', HR_SA_TEXT_DOMAIN); ?></li>
-                                <li><?php esc_html_e('Open Graph', HR_SA_TEXT_DOMAIN); ?>: <?php echo $flags['og'] ? esc_html__('On', HR_SA_TEXT_DOMAIN) : esc_html__('Off', HR_SA_TEXT_DOMAIN); ?></li>
-                                <li><?php esc_html_e('Twitter Cards', HR_SA_TEXT_DOMAIN); ?>: <?php echo $flags['twitter'] ? esc_html__('On', HR_SA_TEXT_DOMAIN) : esc_html__('Off', HR_SA_TEXT_DOMAIN); ?></li>
-                                <li><?php esc_html_e('Debug', HR_SA_TEXT_DOMAIN); ?>: <?php echo $flags['debug'] ? esc_html__('On', HR_SA_TEXT_DOMAIN) : esc_html__('Off', HR_SA_TEXT_DOMAIN); ?></li>
+                                <li><?php esc_html_e('Open Graph & Twitter Cards', HR_SA_TEXT_DOMAIN); ?>: <?php echo $flags['social'] ? esc_html__('On', HR_SA_TEXT_DOMAIN) : esc_html__('Off', HR_SA_TEXT_DOMAIN); ?></li>
+                                <li><?php esc_html_e('AI Assist', HR_SA_TEXT_DOMAIN); ?>: <?php echo $flags['ai'] ? esc_html__('On', HR_SA_TEXT_DOMAIN) : esc_html__('Off', HR_SA_TEXT_DOMAIN); ?></li>
+                                <li><?php esc_html_e('Debug Mode', HR_SA_TEXT_DOMAIN); ?>: <?php echo $flags['debug'] ? esc_html__('On', HR_SA_TEXT_DOMAIN) : esc_html__('Off', HR_SA_TEXT_DOMAIN); ?></li>
                             </ul>
                         </td>
                     </tr>
@@ -162,6 +164,35 @@ function hr_sa_render_debug_page(): void
                             <?php endif; ?>
                         </td>
                     </tr>
+                    <?php
+                    $resolver_source = isset($social_fields['image_source']) ? (string) $social_fields['image_source'] : 'disabled';
+                    $resolver_url    = isset($social_fields['image']) ? (string) $social_fields['image'] : '';
+                    $source_labels   = [
+                        'override' => __('Override', HR_SA_TEXT_DOMAIN),
+                        'meta'     => __('Meta', HR_SA_TEXT_DOMAIN),
+                        'fallback' => __('Fallback', HR_SA_TEXT_DOMAIN),
+                        'disabled' => __('Disabled', HR_SA_TEXT_DOMAIN),
+                    ];
+                    $chip_classes    = [
+                        'override' => 'hr-sa-chip--success',
+                        'meta'     => 'hr-sa-chip--info',
+                        'fallback' => 'hr-sa-chip--warning',
+                        'disabled' => 'hr-sa-chip--neutral',
+                    ];
+                    $chip_class = $chip_classes[$resolver_source] ?? 'hr-sa-chip--neutral';
+                    $chip_label = $source_labels[$resolver_source] ?? ucfirst($resolver_source);
+                    ?>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Social Image Resolver', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td>
+                            <span class="hr-sa-chip <?php echo esc_attr($chip_class); ?>"><?php echo esc_html($chip_label); ?></span>
+                            <?php if ($resolver_url !== '') : ?>
+                                &nbsp;<a href="<?php echo esc_url($resolver_url); ?>" target="_blank" rel="noopener noreferrer"><code><?php echo esc_html($resolver_url); ?></code></a>
+                            <?php else : ?>
+                                <span class="description"><?php esc_html_e('No image resolved', HR_SA_TEXT_DOMAIN); ?></span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </section>
@@ -178,6 +209,16 @@ function hr_sa_render_debug_page(): void
                     <tr>
                         <th scope="row"><?php esc_html_e('Enabled', HR_SA_TEXT_DOMAIN); ?></th>
                         <td><?php echo !empty($ai_snapshot['hr_sa_ai_enabled']) ? esc_html__('Yes', HR_SA_TEXT_DOMAIN) : esc_html__('No', HR_SA_TEXT_DOMAIN); ?></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Instruction', HR_SA_TEXT_DOMAIN); ?></th>
+                        <td>
+                            <?php if (!empty($ai_full['hr_sa_ai_instruction'])) : ?>
+                                <code><?php echo esc_html($ai_full['hr_sa_ai_instruction']); ?></code>
+                            <?php else : ?>
+                                <span class="description"><?php esc_html_e('Not set', HR_SA_TEXT_DOMAIN); ?></span>
+                            <?php endif; ?>
+                        </td>
                     </tr>
                     <tr>
                         <th scope="row"><?php esc_html_e('API Key', HR_SA_TEXT_DOMAIN); ?></th>
@@ -206,6 +247,7 @@ function hr_sa_render_debug_page(): void
                 $summary_message  = isset($ai_summary['message']) ? (string) $ai_summary['message'] : '';
                 $summary_time     = !empty($ai_summary['timestamp']) ? date_i18n(get_option('date_format') . ' ' . get_option('time_format'), (int) $ai_summary['timestamp']) : '';
                 $summary_model    = isset($ai_summary['model']) ? (string) $ai_summary['model'] : '';
+                $summary_tokens   = isset($ai_summary['tokens_used']) ? (int) $ai_summary['tokens_used'] : null;
                 $status_slug      = isset($ai_summary['status']) ? strtolower((string) $ai_summary['status']) : '';
                 ?>
                 <table class="widefat striped">
@@ -221,6 +263,10 @@ function hr_sa_render_debug_page(): void
                         <tr>
                             <th scope="row"><?php esc_html_e('Model', HR_SA_TEXT_DOMAIN); ?></th>
                             <td><?php echo $summary_model !== '' ? esc_html($summary_model) : esc_html__('N/A', HR_SA_TEXT_DOMAIN); ?></td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><?php esc_html_e('Tokens Used', HR_SA_TEXT_DOMAIN); ?></th>
+                            <td><?php echo $summary_tokens !== null ? esc_html(number_format_i18n($summary_tokens)) : esc_html__('N/A', HR_SA_TEXT_DOMAIN); ?></td>
                         </tr>
                         <tr>
                             <th scope="row"><?php esc_html_e('Timestamp', HR_SA_TEXT_DOMAIN); ?></th>

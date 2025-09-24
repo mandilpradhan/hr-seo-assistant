@@ -35,6 +35,7 @@ function hr_sa_get_settings_defaults(): array
         'hr_sa_conflict_mode'            => 'respect',
         'hr_sa_debug_enabled'            => '0',
         'hr_sa_ai_enabled'               => '0',
+        'hr_sa_ai_instruction'           => '',
         'hr_sa_ai_api_key'               => '',
         'hr_sa_ai_model'                 => 'gpt-4o-mini',
         'hr_sa_ai_temperature'           => '0.7',
@@ -157,19 +158,19 @@ function hr_sa_register_settings(): void
     register_setting('hr_sa_settings', 'hr_sa_og_enabled', [
         'type'              => 'boolean',
         'sanitize_callback' => 'hr_sa_sanitize_checkbox',
-        'default'           => '0',
-    ]);
-
-    register_setting('hr_sa_settings', 'hr_sa_twitter_enabled', [
-        'type'              => 'boolean',
-        'sanitize_callback' => 'hr_sa_sanitize_checkbox',
-        'default'           => '0',
+        'default'           => '1',
     ]);
 
     register_setting('hr_sa_settings', 'hr_sa_ai_enabled', [
         'type'              => 'boolean',
         'sanitize_callback' => 'hr_sa_sanitize_checkbox',
         'default'           => hr_sa_get_settings_defaults()['hr_sa_ai_enabled'],
+    ]);
+
+    register_setting('hr_sa_settings', 'hr_sa_ai_instruction', [
+        'type'              => 'string',
+        'sanitize_callback' => 'hr_sa_sanitize_ai_instruction',
+        'default'           => hr_sa_get_settings_defaults()['hr_sa_ai_instruction'],
     ]);
 
     register_setting('hr_sa_settings', 'hr_sa_ai_api_key', [
@@ -298,6 +299,19 @@ function hr_sa_sanitize_twitter_handle($value): string
 }
 
 /**
+ * Sanitize the stored AI instruction text.
+ */
+function hr_sa_sanitize_ai_instruction($value): string
+{
+    $value = is_string($value) ? $value : '';
+    $value = wp_strip_all_tags($value, true);
+    $value = html_entity_decode($value, ENT_QUOTES | ENT_SUBSTITUTE, get_bloginfo('charset') ?: 'UTF-8');
+    $value = (string) preg_replace('/\s+/u', ' ', $value);
+
+    return trim($value);
+}
+
+/**
  * Sanitize the stored AI API key, preserving the existing value when a mask is submitted.
  */
 function hr_sa_sanitize_ai_api_key($value): string
@@ -391,7 +405,7 @@ function hr_sa_get_setting(string $option, $default = null)
     $default = $default ?? ($defaults[$option] ?? '');
     $value = get_option($option, $default);
 
-    if (in_array($option, ['hr_sa_tpl_page_brand_suffix', 'hr_sa_debug_enabled', 'hr_sa_og_enabled', 'hr_sa_twitter_enabled', 'hr_sa_image_url_replace_enabled', 'hr_sa_ai_enabled'], true)) {
+    if (in_array($option, ['hr_sa_tpl_page_brand_suffix', 'hr_sa_debug_enabled', 'hr_sa_og_enabled', 'hr_sa_image_url_replace_enabled', 'hr_sa_ai_enabled'], true)) {
         return $value === '1' || $value === 1 || $value === true;
     }
 
@@ -401,13 +415,14 @@ function hr_sa_get_setting(string $option, $default = null)
 /**
  * Retrieve the AI-related settings with normalized types.
  *
- * @return array{hr_sa_ai_enabled: bool, hr_sa_ai_api_key: string, hr_sa_ai_model: string, hr_sa_ai_temperature: float, hr_sa_ai_max_tokens: int}
+ * @return array{hr_sa_ai_enabled: bool, hr_sa_ai_instruction: string, hr_sa_ai_api_key: string, hr_sa_ai_model: string, hr_sa_ai_temperature: float, hr_sa_ai_max_tokens: int}
  */
 function hr_sa_get_ai_settings(): array
 {
     $defaults = hr_sa_get_settings_defaults();
 
     $enabled     = hr_sa_get_setting('hr_sa_ai_enabled', $defaults['hr_sa_ai_enabled']);
+    $instruction = get_option('hr_sa_ai_instruction', $defaults['hr_sa_ai_instruction']);
     $api_key     = get_option('hr_sa_ai_api_key', $defaults['hr_sa_ai_api_key']);
     $model       = get_option('hr_sa_ai_model', $defaults['hr_sa_ai_model']);
     $temperature = get_option('hr_sa_ai_temperature', $defaults['hr_sa_ai_temperature']);
@@ -415,6 +430,7 @@ function hr_sa_get_ai_settings(): array
 
     $settings = [
         'hr_sa_ai_enabled'     => (bool) $enabled,
+        'hr_sa_ai_instruction' => is_string($instruction) ? hr_sa_sanitize_ai_instruction($instruction) : '',
         'hr_sa_ai_api_key'     => is_string($api_key) ? trim($api_key) : '',
         'hr_sa_ai_model'       => is_string($model) ? sanitize_text_field($model) : (string) $defaults['hr_sa_ai_model'],
         'hr_sa_ai_temperature' => is_numeric($temperature) ? (float) $temperature : (float) $defaults['hr_sa_ai_temperature'],
@@ -449,12 +465,12 @@ function hr_sa_get_all_settings(): array
 
     $settings['hr_sa_tpl_page_brand_suffix'] = hr_sa_get_setting('hr_sa_tpl_page_brand_suffix');
     $settings['hr_sa_debug_enabled'] = hr_sa_get_setting('hr_sa_debug_enabled');
-    $settings['hr_sa_og_enabled'] = hr_sa_is_flag_enabled('hr_sa_og_enabled');
-    $settings['hr_sa_twitter_enabled'] = hr_sa_is_flag_enabled('hr_sa_twitter_enabled');
+    $settings['hr_sa_og_enabled'] = hr_sa_is_flag_enabled('hr_sa_og_enabled', true);
     $settings['hr_sa_image_url_replace_enabled'] = hr_sa_get_setting('hr_sa_image_url_replace_enabled');
 
     $ai_settings = hr_sa_get_ai_settings();
     $settings['hr_sa_ai_enabled'] = $ai_settings['hr_sa_ai_enabled'];
+    $settings['hr_sa_ai_instruction'] = $ai_settings['hr_sa_ai_instruction'];
     $settings['hr_sa_ai_model'] = $ai_settings['hr_sa_ai_model'];
     $settings['hr_sa_ai_temperature'] = $ai_settings['hr_sa_ai_temperature'];
     $settings['hr_sa_ai_max_tokens'] = $ai_settings['hr_sa_ai_max_tokens'];

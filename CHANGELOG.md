@@ -7,9 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Planned
-- **0.3.0**: Template polish, description fallback order, preview card.
 - **1.0.0**: Stable release – OG + JSON-LD parity, diagnostics.
 - **2.0.0**: AI Assist module (OpenAI) for titles/descriptions/keywords.
+
+## [0.3.0] - 2025-09-30
+### Added
+- Modules page controls with live toggles, Conflict Mode awareness, and a reset-to-defaults action for JSON-LD, Open Graph & Twitter, AI Assist, and Debug.
+- Social image resolver shared across emitters, debug tooling, and a new admin bar badge that reports the current OG image source.
+- Per-page social overrides for image and description, plus an AI instruction/style guide setting that guides admin-only generation workflows.
+
+### Changed
+- Bundled Open Graph and Twitter Card output behind a single module that honours Respect/Force Conflict Modes and other SEO plugins.
+- Debug diagnostics now surface AI instruction text, token usage, module statuses, and social image source details.
+- AI generation enforces tighter title/description limits, supports 3–8 keyword guidance, and records token usage for transparency.
 
 ## [0.2.0] - 2025-09-24
 ### Added
