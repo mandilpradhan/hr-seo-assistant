@@ -36,10 +36,24 @@
 
         const newValue = typeof value === 'string' ? value : '';
         if (field.value === newValue) {
+            if (typeof field.classList !== 'undefined') {
+                if (newValue) {
+                    field.classList.add('hr-sa-ai-filled');
+                } else {
+                    field.classList.remove('hr-sa-ai-filled');
+                }
+            }
             return;
         }
 
         field.value = newValue;
+        if (typeof field.classList !== 'undefined') {
+            if (newValue) {
+                field.classList.add('hr-sa-ai-filled');
+            } else {
+                field.classList.remove('hr-sa-ai-filled');
+            }
+        }
         try {
             field.dispatchEvent(new Event('change', { bubbles: true }));
         } catch (error) {

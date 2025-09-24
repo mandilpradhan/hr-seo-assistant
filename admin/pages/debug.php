@@ -201,10 +201,12 @@ function hr_sa_render_debug_page(): void
             <h3><?php esc_html_e('Last AI Request', HR_SA_TEXT_DOMAIN); ?></h3>
             <?php if ($ai_summary) : ?>
                 <?php
-                $summary_type    = isset($ai_summary['type']) ? ucwords(str_replace('_', ' ', (string) $ai_summary['type'])) : '';
-                $summary_status  = isset($ai_summary['status']) ? ucwords((string) $ai_summary['status']) : '';
-                $summary_message = isset($ai_summary['message']) ? (string) $ai_summary['message'] : '';
-                $summary_time    = !empty($ai_summary['timestamp']) ? date_i18n(get_option('date_format') . ' ' . get_option('time_format'), (int) $ai_summary['timestamp']) : '';
+                $summary_type     = isset($ai_summary['type']) ? ucwords(str_replace('_', ' ', (string) $ai_summary['type'])) : '';
+                $summary_status   = isset($ai_summary['status']) ? ucwords((string) $ai_summary['status']) : '';
+                $summary_message  = isset($ai_summary['message']) ? (string) $ai_summary['message'] : '';
+                $summary_time     = !empty($ai_summary['timestamp']) ? date_i18n(get_option('date_format') . ' ' . get_option('time_format'), (int) $ai_summary['timestamp']) : '';
+                $summary_model    = isset($ai_summary['model']) ? (string) $ai_summary['model'] : '';
+                $status_slug      = isset($ai_summary['status']) ? strtolower((string) $ai_summary['status']) : '';
                 ?>
                 <table class="widefat striped">
                     <tbody>
@@ -217,13 +219,19 @@ function hr_sa_render_debug_page(): void
                             <td><?php echo $summary_status !== '' ? esc_html($summary_status) : esc_html__('N/A', HR_SA_TEXT_DOMAIN); ?></td>
                         </tr>
                         <tr>
-                            <th scope="row"><?php esc_html_e('Message', HR_SA_TEXT_DOMAIN); ?></th>
-                            <td><?php echo $summary_message !== '' ? esc_html($summary_message) : esc_html__('N/A', HR_SA_TEXT_DOMAIN); ?></td>
+                            <th scope="row"><?php esc_html_e('Model', HR_SA_TEXT_DOMAIN); ?></th>
+                            <td><?php echo $summary_model !== '' ? esc_html($summary_model) : esc_html__('N/A', HR_SA_TEXT_DOMAIN); ?></td>
                         </tr>
                         <tr>
                             <th scope="row"><?php esc_html_e('Timestamp', HR_SA_TEXT_DOMAIN); ?></th>
                             <td><?php echo $summary_time !== '' ? esc_html($summary_time) : esc_html__('N/A', HR_SA_TEXT_DOMAIN); ?></td>
                         </tr>
+                        <?php if ($status_slug === 'error' && $summary_message !== '') : ?>
+                            <tr>
+                                <th scope="row"><?php esc_html_e('Message', HR_SA_TEXT_DOMAIN); ?></th>
+                                <td><?php echo esc_html($summary_message); ?></td>
+                            </tr>
+                        <?php endif; ?>
                     </tbody>
                 </table>
             <?php else : ?>

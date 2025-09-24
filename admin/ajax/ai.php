@@ -31,17 +31,36 @@ function hr_sa_ajax_ai_test_connection(): void
     }
 
     $settings = hr_sa_ai_get_settings(true);
-    $result = hr_sa_ai_generate('test_connection', [], $settings);
+
+    if (empty($settings['hr_sa_ai_enabled'])) {
+        wp_send_json_error(['message' => __('AI assistance is currently disabled.', HR_SA_TEXT_DOMAIN)], 200);
+    }
+
+    $api_key = isset($settings['hr_sa_ai_api_key']) ? trim((string) $settings['hr_sa_ai_api_key']) : '';
+    if ($api_key === '') {
+        wp_send_json_error(['message' => __('Add an API key before testing the connection.', HR_SA_TEXT_DOMAIN)], 200);
+    }
+
+    $settings['hr_sa_ai_max_tokens'] = 8;
+
+    $context = [
+        'post_id'       => 0,
+        'post_type'     => 'test',
+        'title'         => 'Connectivity check',
+        'excerpt'       => '',
+        'content'       => '',
+        'canonical_url' => '',
+        'site_name'     => '',
+    ];
+
+    $result = hr_sa_ai_generate('title', $context, $settings);
+
     if (is_wp_error($result)) {
         $message = $result->get_error_message();
         wp_send_json_error(['message' => $message], 200);
     }
 
-    $success_message = (string) $result !== ''
-        ? (string) $result
-        : __('Connection successful.', HR_SA_TEXT_DOMAIN);
-
-    wp_send_json_success(['message' => $success_message]);
+    wp_send_json_success(['message' => __('OpenAI reachable', HR_SA_TEXT_DOMAIN)]);
 }
 
 /**
