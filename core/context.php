@@ -417,6 +417,9 @@ function hr_sa_apply_image_url_replacements(string $url): string
         if ($suffix_length > 0 && strlen($updated) >= $suffix_length && substr($updated, -$suffix_length) === $rules['suffix_find']) {
             $updated = substr($updated, 0, strlen($updated) - $suffix_length) . $rules['suffix_replace'];
         }
+    } elseif ($rules['suffix_replace'] !== '') {
+        // If no suffix find term is configured, append the replacement directly.
+        $updated .= $rules['suffix_replace'];
     }
 
     /**
