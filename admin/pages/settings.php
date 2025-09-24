@@ -21,8 +21,6 @@ function hr_sa_render_settings_page(): void
     }
 
     $fallback      = (string) hr_sa_get_setting('hr_sa_fallback_image', '');
-    $og_enabled    = hr_sa_is_flag_enabled('hr_sa_og_enabled', false);
-    $twitter_cards = hr_sa_is_flag_enabled('hr_sa_twitter_enabled', false);
     $tpl_trip      = (string) hr_sa_get_setting('hr_sa_tpl_trip');
     $tpl_page      = (string) hr_sa_get_setting('hr_sa_tpl_page');
     $brand_suffix  = (bool) hr_sa_get_setting('hr_sa_tpl_page_brand_suffix');
@@ -42,6 +40,7 @@ function hr_sa_render_settings_page(): void
     $debug_enabled = hr_sa_is_debug_enabled();
     $ai_settings   = hr_sa_get_ai_settings();
     $ai_enabled    = (bool) $ai_settings['hr_sa_ai_enabled'];
+    $ai_instruction = (string) $ai_settings['hr_sa_ai_instruction'];
     $ai_model      = (string) $ai_settings['hr_sa_ai_model'];
     $ai_temperature = (float) $ai_settings['hr_sa_ai_temperature'];
     $ai_max_tokens = (int) $ai_settings['hr_sa_ai_max_tokens'];
@@ -81,33 +80,20 @@ function hr_sa_render_settings_page(): void
                         </td>
                     </tr>
                     <tr>
-                        <th scope="row"><?php esc_html_e('Social Metadata', HR_SA_TEXT_DOMAIN); ?></th>
-                        <td>
-                            <fieldset>
-                                <legend class="screen-reader-text"><?php esc_html_e('Social Metadata Toggles', HR_SA_TEXT_DOMAIN); ?></legend>
-                                <label for="hr_sa_og_enabled">
-                                    <input type="checkbox" id="hr_sa_og_enabled" name="hr_sa_og_enabled" value="1" <?php checked($og_enabled); ?> />
-                                    <?php esc_html_e('Enable Open Graph tags', HR_SA_TEXT_DOMAIN); ?>
-                                </label>
-                                <br />
-                                <label for="hr_sa_twitter_enabled">
-                                    <input type="checkbox" id="hr_sa_twitter_enabled" name="hr_sa_twitter_enabled" value="1" <?php checked($twitter_cards); ?> />
-                                    <?php esc_html_e('Enable Twitter Card tags', HR_SA_TEXT_DOMAIN); ?>
-                                </label>
-                                <p class="description"><?php esc_html_e('Twitter Cards reuse Open Graph data and require a large hero image or fallback.', HR_SA_TEXT_DOMAIN); ?></p>
-                            </fieldset>
-                        </td>
-                    </tr>
-                    <tr>
                         <th scope="row"><?php esc_html_e('AI Assistance', HR_SA_TEXT_DOMAIN); ?></th>
                         <td>
                             <fieldset>
                                 <legend class="screen-reader-text"><?php esc_html_e('AI Assistance', HR_SA_TEXT_DOMAIN); ?></legend>
-                                <label for="hr_sa_ai_enabled">
-                                    <input type="checkbox" id="hr_sa_ai_enabled" name="hr_sa_ai_enabled" value="1" <?php checked($ai_enabled); ?> />
-                                    <?php esc_html_e('Enable AI assistance for administrators', HR_SA_TEXT_DOMAIN); ?>
-                                </label>
+                                <p class="hr-sa-ai-status">
+                                    <span class="hr-sa-chip <?php echo esc_attr($ai_enabled ? 'hr-sa-chip--success' : 'hr-sa-chip--neutral'); ?>"><?php echo $ai_enabled ? esc_html__('AI Assist is enabled.', HR_SA_TEXT_DOMAIN) : esc_html__('AI Assist is disabled.', HR_SA_TEXT_DOMAIN); ?></span>
+                                    <span class="description"><?php esc_html_e('Toggle the AI Assist module from the HR SEO → Modules page.', HR_SA_TEXT_DOMAIN); ?></span>
+                                </p>
                                 <p class="description hr-sa-ai-hint"><?php esc_html_e('Admin-only. No front-end API calls will ever occur.', HR_SA_TEXT_DOMAIN); ?></p>
+                                <div class="hr-sa-ai-field hr-sa-ai-field--instruction">
+                                    <label for="hr_sa_ai_instruction"><strong><?php esc_html_e('AI Instruction / Style Guide', HR_SA_TEXT_DOMAIN); ?></strong></label>
+                                    <textarea class="widefat" id="hr_sa_ai_instruction" name="hr_sa_ai_instruction" rows="4"><?php echo esc_textarea($ai_instruction); ?></textarea>
+                                    <p class="description"><?php esc_html_e('Guidance for AI generation (tone, length, dos/don’ts). Example: “Adventure travel audience, neutral tone, 55–65 char titles, 140–160 char descriptions, include destination and trip type, no emojis.”', HR_SA_TEXT_DOMAIN); ?></p>
+                                </div>
                                 <div class="hr-sa-ai-settings">
                                     <div class="hr-sa-ai-settings__field">
                                         <label for="hr_sa_ai_api_key"><?php esc_html_e('API Key', HR_SA_TEXT_DOMAIN); ?></label>
@@ -223,13 +209,7 @@ function hr_sa_render_settings_page(): void
                                     <input type="radio" name="hr_sa_conflict_mode" value="force" <?php checked($conflict_mode, 'force'); ?> />
                                     <?php esc_html_e('Force HR SEO output', HR_SA_TEXT_DOMAIN); ?>
                                 </label>
-                                <br />
-                                <label>
-                                    <input type="radio" name="hr_sa_conflict_mode" value="block_og" <?php checked($conflict_mode, 'block_og'); ?> />
-                                    <?php esc_html_e('Block other OG insertions', HR_SA_TEXT_DOMAIN); ?>
-                                </label>
-                                <p class="description"><?php esc_html_e('Respect mode will defer JSON-LD when another SEO plugin is detected.', HR_SA_TEXT_DOMAIN); ?></p>
-                                <p class="description"><?php esc_html_e("Block mode removes other plugins' OG/Twitter meta so HR SEO Assistant is the single source of truth.", HR_SA_TEXT_DOMAIN); ?></p>
+                                <p class="description"><?php esc_html_e('Respect mode yields to other SEO plugins when detected. Force mode outputs HR SEO Assistant metadata regardless of other plugins.', HR_SA_TEXT_DOMAIN); ?></p>
                             </fieldset>
                         </td>
                     </tr>

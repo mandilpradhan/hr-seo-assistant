@@ -17,11 +17,10 @@ if (!defined('ABSPATH')) {
 function hr_sa_feature_flags_initialize_defaults(): void
 {
     $defaults = [
-        'hr_sa_jsonld_enabled'      => '1',
-        'hr_sa_og_enabled'          => '0',
-        'hr_sa_twitter_enabled'     => '0',
-        'hr_sa_debug_enabled'       => hr_sa_get_settings_defaults()['hr_sa_debug_enabled'],
-        'hr_sa_respect_other_seo'   => '1',
+        'hr_sa_jsonld_enabled'    => '1',
+        'hr_sa_og_enabled'        => '1',
+        'hr_sa_debug_enabled'     => hr_sa_get_settings_defaults()['hr_sa_debug_enabled'],
+        'hr_sa_respect_other_seo' => '1',
     ];
 
     foreach ($defaults as $option => $value) {
@@ -54,7 +53,7 @@ function hr_sa_is_jsonld_enabled(): bool
  */
 function hr_sa_is_og_enabled(): bool
 {
-    $enabled = hr_sa_is_flag_enabled('hr_sa_og_enabled', false);
+    $enabled = hr_sa_is_flag_enabled('hr_sa_og_enabled', true);
     $enabled = (bool) apply_filters('hr_sa_og_enabled', $enabled);
 
     /**
@@ -70,8 +69,7 @@ function hr_sa_is_og_enabled(): bool
  */
 function hr_sa_is_twitter_enabled(): bool
 {
-    $enabled = hr_sa_is_flag_enabled('hr_sa_twitter_enabled', false);
-    $enabled = (bool) apply_filters('hr_sa_twitter_enabled', $enabled);
+    $enabled = hr_sa_is_og_enabled();
 
     /**
      * Filter whether Twitter Card output should be enabled.
@@ -98,7 +96,11 @@ function hr_sa_is_debug_enabled(): bool
 function hr_sa_get_conflict_mode(): string
 {
     $mode    = (string) get_option('hr_sa_conflict_mode', 'respect');
-    $allowed = ['respect', 'force', 'block_og', 'block_others'];
+    if ($mode === 'block_og' || $mode === 'block_others') {
+        $mode = 'force';
+    }
+
+    $allowed = ['respect', 'force'];
     $mode    = in_array($mode, $allowed, true) ? $mode : 'respect';
 
     /**
@@ -108,10 +110,6 @@ function hr_sa_get_conflict_mode(): string
      */
     $mode = (string) apply_filters('hr_sa_conflict_mode', $mode);
 
-    if ($mode === 'block_others') {
-        $mode = 'block_og';
-    }
-
     return $mode;
 }
 
@@ -120,8 +118,8 @@ function hr_sa_get_conflict_mode(): string
  */
 function hr_sa_conflict_mode_is(string $mode): bool
 {
-    if ($mode === 'block_others') {
-        $mode = 'block_og';
+    if ($mode === 'block_og' || $mode === 'block_others') {
+        $mode = 'force';
     }
 
     return hr_sa_get_conflict_mode() === $mode;
@@ -133,7 +131,6 @@ function hr_sa_conflict_mode_is(string $mode): bool
 function hr_sa_should_respect_other_seo(): bool
 {
     $option = hr_sa_is_flag_enabled('hr_sa_respect_other_seo', true);
-    $mode   = hr_sa_get_conflict_mode();
 
-    return $mode === 'respect' && $option;
+    return hr_sa_get_conflict_mode() === 'respect' && $option;
 }

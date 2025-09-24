@@ -1,127 +1,136 @@
-# HR SEO Assistant — Phase 0 Testing Checklist
-Version: 0.1.0
+# HR SEO Assistant — Phase 3 Testing Checklist
+Version: 0.3.0
 
-## Goal of Phase 0
-- Plugin scaffold works (menus, settings, feature flags, debug).
-- JSON-LD emitters adopted into the plugin produce **parity** with legacy MU output.
-- **OG/Twitter is OFF** in this phase.
+## Goal of Phase 3
+- Modules page acts as the single source of truth for feature toggles.
+- Conflict Mode governs Open Graph & Twitter Cards behavior and UI states.
+- Social image/description overrides resolve in the correct priority order.
+- AI Assist remains admin-only, honours instruction guidance, and records token usage.
+- Admin bar badge, debug page, and emitters all consume the shared resolver contract.
 
 ---
 
 ## 0) Pre-checks
 - ✅ Plugin “HR SEO Assistant” is **Activated**.
-- ✅ Legacy schema MUs still active in `/wp-content/mu-plugins/` (reference).
-- ✅ Repo contains `legacy-mu/` (read-only source for Codex).
-- ✅ You can access: `HR SEO → Overview`, `Settings`, `Modules`.
-- 🚫 No OG/Twitter tags should be emitted yet.
+- ✅ Database upgrade has run (visit any admin page to trigger if unsure).
+- ✅ Confirm **Version 0.3.0** is displayed in the plugin list or debug snapshot.
+- ✅ You have access to `HR SEO → Modules`, `Settings`, `Debug`.
+- ✅ At least one public post/page exists for front-end validation.
 
 ---
 
-## 1) Settings sanity
-1. Go to **HR SEO → Settings**.
-2. Fill these (any sensible values for now):
-   - **Fallback Image (sitewide):** pick a real URL via Media Picker.
-   - **Title templates:**
-     - Trips: `{{trip_name}} | Motorcycle Tour in {{country}}`
-     - Pages: `{{page_title}}` (leave “Append brand suffix” OFF for Phase 0)
-   - **Locale:** `en_US`
-   - **Site name:** `Himalayan Rides`
-   - **Twitter handle:** `@himalayanrides` (optional)
-   - **Image preset:** `w=1200,fit=cover,gravity=auto,format=auto,quality=75`
-   - **Conflict mode:** **Respect**
-   - **Debug mode:** **ON**
-3. Save. You should see a success notice.
+## 1) Modules page — baseline state
+1. Navigate to **HR SEO → Modules**.
+2. Verify default toggle states:
+   - JSON-LD Emitters → **On**
+   - Open Graph & Twitter Cards → **On** (unless locked by Conflict Mode)
+   - AI Assist → **Off**
+   - Debug Mode → **Off**
+3. Click **Save Modules** without changing values — expect a success notice with no PHP warnings.
+4. Toggle each module, save, and ensure state persists after reload.
+5. Use **Reset to Defaults** and confirm all toggles return to their default positions and notice displays.
 
 ---
 
-## 2) Debug page (should appear because Debug = ON)
-Navigate: **HR SEO → Debug**  
-Verify:
-- **Environment:** Post ID / Type / Template, Current URL, Conflict Mode, Flags (jsonld/og/debug).
-- **Context:** shows at least `url, type, site_name, locale, twitter_handle, hero_url (may be null)`.
-- **Connectors:** “Hero filter” present? (OK if **No** for now.)
-- **Settings snapshot:** values you saved above.
-- **Modules:** JSON-LD (enabled), OG (disabled).
-- **No errors/warnings**.
+## 2) Conflict Mode interactions
+1. Install/activate one of Rank Math, Yoast, or SEOPress (or simulate via filter `add_filter( 'hr_sa_other_seo_active', '__return_true' );`).
+2. Set **Conflict Mode** (Settings → General) to **Respect** and save.
+3. Return to **Modules** and confirm:
+   - Open Graph & Twitter Cards toggle is **disabled**.
+   - Status chip reads “Disabled by Conflict Mode”.
+   - Tooltip copy matches spec (“Disabled by Conflict Mode (Respect)… Force…”).
+4. Switch Conflict Mode to **Force** and reload Modules:
+   - Toggle becomes interactive again.
+   - Chip reflects Enabled/Disabled based on saved value.
+5. Repeat with no SEO plugin active to ensure Respect mode leaves toggle enabled.
 
 ---
 
-## 3) No OG/Twitter emission
-Open a page and **View Source**. Confirm:
-- There is **no** `<meta property="og:title">` emitted by HR SEO Assistant.
-- There is **no** `twitter:` meta emitted by HR SEO Assistant.  
-(Other plugins may output theirs if installed; that’s fine in Phase 0.)
+## 3) Settings page updates
+1. Open **HR SEO → Settings**.
+2. Locate the **AI Instruction / Style Guide** textarea.
+3. Enter guidance text (e.g., “Adventure travel audience…”), save, and confirm success notice.
+4. Reload the page — ensure textarea retains saved content.
+5. Confirm existing settings (fallback image, locale, site name, Twitter handle, conflict mode, image preset) remain editable.
 
 ---
 
-## 4) JSON-LD parity — capture current (legacy) output
-Pick three URLs:
-- **Trip page** (with FAQ + Itinerary if possible)
-- **Generic page** (About/Contact)
-- **Homepage**
-
-For each URL, capture current JSON-LD (legacy MUs):
-```bash
-# Replace with actual URLs
-URL="https://himalayanrides.com/trip/bhutan-motorcycle-tour-chasing-the-thunder-dragon/"
-curl -s "$URL" | perl -0777 -ne 'print "$1\n" while (/\<script type="application\/ld\+json"\>(.*?)\<\/script\>/sg)' > /tmp/legacy-trip.json
-
-URL="https://himalayanrides.com/"
-curl -s "$URL" | perl -0777 -ne 'print "$1\n" while (/\<script type="application\/ld\+json"\>(.*?)\<\/script\>/sg)' > /tmp/legacy-home.json
-```
-
-> Note: Some pages output **multiple** JSON-LD blocks. Saving the concatenation is fine—we’ll compare normalized JSON, not formatting.
+## 4) Per-page social overrides
+1. Edit a supported post type (post, page, trip).
+2. In the **HR SEO Assistant** meta box:
+   - Confirm “Social Image Override” (URL) and “Social Description Override” (textarea) fields exist.
+   - Helper text: “Leave blank to use site defaults.” is visible.
+3. Enter values and save/update the post:
+   - Valid HTTPS image URL should persist.
+   - Description trims to the configured length (140–160 characters guidance).
+4. Clear the fields and resave — meta keys should delete (check via `get_post_meta`).
+5. Ensure nonce errors do not occur when saving posts (quick edit / autosave should not trigger updates).
 
 ---
 
-## 5) Switch to plugin JSON-LD (temporarily disable legacy)
-**Because MU-plugins always load**, do ONE of these on staging:
+## 5) Social resolver & admin bar badge
+1. Visit the saved post on the front-end while logged in as an admin.
+2. Inspect the admin bar — confirm a badge in the top bar displaying:
+   - `OG: override` (green) when override URL present.
+   - `OG: meta` (blue) when falling back to `_hrih_header_image_url`.
+   - `OG: fallback` (orange) when using the global fallback image.
+   - `OG: disabled` (gray) when module is off or Conflict Mode suppresses output.
+3. When a URL exists, badge links to the resolved image in a new tab.
+4. Validate `hr_sa_resolve_social_image_url()` returns the same source via the Debug page (see next section).
 
-- Easiest: **Temporarily rename** each relevant MU file in `/wp-content/mu-plugins/` from `*.php` → `*.ph_` (so WP won’t load it).  
-  Example:
+---
+
+## 6) Debug page verification
+1. Enable **Debug Mode** (via Modules or Settings) if not already on.
+2. Navigate to **HR SEO → Debug**.
+3. Confirm sections include:
+   - Environment (post ID, type, URL).
+   - Flags/module table showing JSON-LD, OG/Twitter, AI Assist, Debug Mode states.
+   - Conflict Mode status and detected plugins.
+   - Social resolver output (`url`, `source`).
+   - Settings snapshot including AI instruction text.
+   - AI usage table with last run timestamp/model/tokens (if available).
+4. When toggles or overrides change, reload to ensure Debug reflects new values.
+
+---
+
+## 7) AI Assist workflow
+1. Ensure **AI Assist module** is enabled.
+2. On a post edit screen, confirm Generate buttons (Title, Description, Keywords) appear and are admin-only.
+3. Trigger each button:
+   - Requests should include the saved AI instruction (inspect via debug logs or instrumentation as available).
+   - Title ≤ 65 chars, Description 140–160 chars, Keywords 3–8 comma separated.
+   - `_hr_sa_title`, `_hr_sa_description`, `_hr_sa_keywords` meta fields store sanitized output.
+4. Debug page should log last run timestamp, status, model, and token counts.
+5. Disable the AI module and verify buttons disappear.
+
+---
+
+## 8) Front-end meta output
+1. View source of a post/page while OG module is enabled:
+   - `<meta property="og:title">`, `<meta property="og:description">`, and `<meta property="og:image">` exist.
+   - Twitter tags mirror OG values when module is active.
+2. Toggle OG module off (or set Conflict Mode Respect with other SEO active) and confirm HR SEO Assistant stops outputting social tags.
+3. Validate description precedence:
+   - Override description wins when provided.
+   - Otherwise generated/AI/excerpt is used (check via Debug page context).
+
+---
+
+## 9) Regression & tooling checks
+- ✅ Run PHP syntax linting:
   ```bash
-  cd /path/to/wp-content/mu-plugins
-  mv hr-schema-core.php hr-schema-core.ph_
-  mv hr-trip-schema-graph.php hr-trip-schema-graph.ph_
-  mv hr-wte-vehicle-offers.php hr-wte-vehicle-offers.ph_
+  find . -type f -name "*.php" -not -path "./vendor/*" -print0 | xargs -0 -n1 php -l
   ```
-
-- OR move them into a `disabled-mu/` folder temporarily.
-
-Ensure HR SEO Assistant’s JSON-LD module is **enabled** (it should be by default in Phase 0).
+- ✅ Spot-check for PHP warnings/notices in debug.log when toggling modules, saving posts, and loading front-end.
+- ✅ Confirm no mixed-content warnings when using overrides (HTTPS enforced).
 
 ---
 
-## 6) JSON-LD parity — capture plugin output
-Use the same URLs as step 4:
-```bash
-URL="https://himalayanrides.com/trip/bhutan-motorcycle-tour-chasing-the-thunder-dragon/"
-curl -s "$URL" | perl -0777 -ne 'print "$1\n" while (/\<script type="application\/ld\+json"\>(.*?)\<\/script\>/sg)' > /tmp/plugin-trip.json
-```
-
----
-
-## 7) Compare outputs (normalized)
-If `jq` is available:
-```bash
-jq -S . /tmp/legacy-trip.json  >/tmp/legacy-trip.norm.json 2>/dev/null || cp /tmp/legacy-trip.json  /tmp/legacy-trip.norm.json
-jq -S . /tmp/plugin-trip.json  >/tmp/plugin-trip.norm.json 2>/dev/null || cp /tmp/plugin-trip.json  /tmp/plugin-trip.norm.json
-diff -u /tmp/legacy-trip.norm.json /tmp/plugin-trip.norm.json || echo "Trip JSON-LD: differences shown above"
-```
-
----
-
-## 8) Restore legacy MUs (until Phase 1)
-Rename MU files back to `*.php` so production behavior is unchanged until we ship OG in Phase 1.
-
----
-
-## 9) Final checks
-- **HR SEO Assistant** remains active.
-- **Debug** page shows JSON-LD module enabled, OG disabled.
-- No PHP notices/fatals in error logs during page loads.
-
-✅ **Phase 0 is complete** when:
-- JSON-LD parity is verified on the three page types.
-- Admin UI & Debug behave correctly.
-- No OG/Twitter emitted by our plugin yet.
+✅ **Phase 3 is complete** when:
+- Modules screen reflects conflict-aware toggles and reset behavior.
+- Settings include AI instruction guidance that persists.
+- Social overrides, resolver contract, debug page, and admin bar badge all agree on the same source.
+- AI Assist respects admin-only scope and instruction text.
+- Front-end emits OG/Twitter tags only when allowed, using the resolved image/description order.
+- Linting passes and no PHP errors are observed.

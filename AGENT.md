@@ -11,8 +11,8 @@ Follow these conventions and guardrails at all times.
 - **Prefix:** `hr_sa_`
 - **Purpose:** Provide SEO scaffolding for Himalayan Rides websites.
   - JSON-LD (Schema.org) emitters (Trips, FAQ, Itinerary, Organization, Vehicles).
-  - OG/Twitter/social meta tags (future phase).
-  - Optional AI helpers (title, description, keyword generation) (future phase).
+  - Open Graph & Twitter Cards with conflict-aware controls and social image resolution.
+  - Admin-only AI helpers (title, description, keyword generation) with configurable guidance.
 
 ---
 
@@ -38,7 +38,7 @@ hr-seo-assistant/
 ├─ admin/ # admin UI
 ├─ modules/ # feature modules
 │ ├─ jsonld/ # JSON-LD emitters
-│ └─ og/ # OG/Twitter emitters (stub until Phase 1)
+│ └─ og/ # OG/Twitter emitters
 ├─ integrations/ # safe connectors (e.g., Media Help)
 ├─ assets/ # admin CSS/JS
 ├─ legacy-mu/ # reference only, do not load
@@ -61,13 +61,13 @@ hr-seo-assistant/
   - **Phase 0:** Scaffold + JSON-LD adoption, OG OFF.
   - **Phase 1:** Implement OG/Twitter using hero images or fallback.
   - **Phase 2:** AI-assisted SEO helpers (OpenAI API).
+  - **Phase 3:** Modules as source of truth, conflict-aware OG/Twitter, social overrides, AI instruction guide.
 
 ---
 
 ## Guardrails
 - Never hardcode site-specific domains, IDs, or tokens. Use filters/options.
 - Do not silently overwrite other SEO plugin output unless **Conflict Mode = Force**.
-- Do not emit OG/Twitter tags until Phase 1.
 - Do not fold unrelated custom plugins (ACF Autofiller, Trips Widget, etc.) into this project.
 - Always sanitize & validate option values.
 
@@ -76,11 +76,11 @@ hr-seo-assistant/
 ## Debug Page Expectations
 When Debug mode is enabled:
 - Show environment (post ID/type/url).
-- Show flags (jsonld, og, debug, conflict).
-- Show settings snapshot.
-- Show connector state (hero image resolved or not).
+- Show flags (JSON-LD, OG/Twitter, AI, Debug, conflict status).
+- Surface module states, social image source, and connector data.
+- Show settings snapshot, including AI instruction text.
 - Show assembled SEO context (`hr_sa_get_context`).
-- Show module status (active/inactive).
+- Provide token usage details for the last AI request.
 - Optional: Copy-as-JSON button.
 
 ---
@@ -97,5 +97,5 @@ When Debug mode is enabled:
 If spec is incomplete or ambiguous:
 1. Leave clear `// TODO:` or `@todo` comments.
 2. Avoid assumptions that lock future development paths.
-3. Defer OG/Twitter and AI until explicitly greenlit in roadmap.
+3. Honour Conflict Mode and admin-only AI scope in every context.
 

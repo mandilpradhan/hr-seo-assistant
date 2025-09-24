@@ -25,6 +25,7 @@ function hr_sa_get_context(): array
     $locale    = (string) hr_sa_get_setting('hr_sa_locale', get_locale());
     $twitter   = (string) hr_sa_get_setting('hr_sa_twitter_handle', '');
     $image     = hr_sa_resolve_context_image_url($post_id > 0 ? $post_id : null);
+    $social    = hr_sa_resolve_social_image_url($post_id > 0 ? $post_id : 0);
 
     $context = [
         'url'            => hr_sa_guess_canonical_url(),
@@ -37,6 +38,8 @@ function hr_sa_get_context(): array
         'twitter_handle' => $twitter,
         'hero_url'       => $image,
         'image'          => $image,
+        'social_image'   => $social['url'] ?? '',
+        'social_image_source' => $social['source'] ?? 'disabled',
     ];
 
     return apply_filters('hr_sa_get_context', $context);
@@ -288,6 +291,11 @@ function hr_sa_resolve_context_image_url(?int $post_id): ?string
     $candidates = [];
 
     if ($post_id) {
+        $override = hr_sa_get_social_image_override($post_id);
+        if ($override !== '') {
+            $candidates[] = $override;
+        }
+
         $meta = get_post_meta($post_id, '_hrih_header_image_url', true);
         if (is_array($meta) && isset($meta['url'])) {
             $meta = (string) $meta['url'];

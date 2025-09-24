@@ -51,7 +51,7 @@ function hr_sa_ai_get_settings(bool $with_key = false): array
  */
 function hr_sa_ai_get_title_limit(): int
 {
-    $limit = (int) apply_filters('hr_sa_ai_title_limit', 70);
+    $limit = (int) apply_filters('hr_sa_ai_title_limit', 65);
 
     return $limit > 0 ? $limit : 70;
 }
@@ -71,9 +71,9 @@ function hr_sa_ai_get_description_limit(): int
  */
 function hr_sa_ai_get_keywords_min(): int
 {
-    $min = (int) apply_filters('hr_sa_ai_keywords_min', 5);
+    $min = (int) apply_filters('hr_sa_ai_keywords_min', 3);
 
-    return $min > 0 ? $min : 5;
+    return $min > 0 ? $min : 3;
 }
 
 /**
@@ -484,6 +484,12 @@ function hr_sa_ai_build_messages(string $type, array $context): array
             break;
     }
 
+    $style_instruction = '';
+    $ai_settings       = hr_sa_get_ai_settings();
+    if (!empty($ai_settings['hr_sa_ai_instruction'])) {
+        $style_instruction = hr_sa_ai_prepare_snippet((string) $ai_settings['hr_sa_ai_instruction'], 400);
+    }
+
     $messages = [
         [
             'role'    => 'system',
@@ -493,10 +499,18 @@ function hr_sa_ai_build_messages(string $type, array $context): array
             'role'    => 'system',
             'content' => $policy_message,
         ],
-        [
-            'role'    => 'user',
-            'content' => $user_message,
-        ],
+    ];
+
+    if ($style_instruction !== '') {
+        $messages[] = [
+            'role'    => 'system',
+            'content' => sprintf(__('Style guidance: %s', HR_SA_TEXT_DOMAIN), $style_instruction),
+        ];
+    }
+
+    $messages[] = [
+        'role'    => 'user',
+        'content' => $user_message,
     ];
 
     $filter_name = 'hr_sa_ai_prompt_' . $type;
@@ -579,7 +593,7 @@ function hr_sa_ai_prompt_template_description(array $context, int $description_l
 
     $lines = [
         sprintf('Task: Write an SEO meta description for a %s.', $post_type !== '' ? $post_type : 'post'),
-        sprintf('Constraints: <= %d characters; persuasive, active voice; highlight unique value; avoid generic fluff; no quotes or emojis.', $description_limit),
+        sprintf('Constraints: 140–160 characters (<= %d); persuasive, active voice; highlight unique value; avoid generic fluff; no quotes or emojis.', $description_limit),
         'Context:',
         '- Title: ' . ($post_title !== '' ? $post_title : 'N/A'),
     ];
@@ -629,7 +643,7 @@ function hr_sa_ai_prompt_template_keywords(array $context): string
 
     $lines = [
         sprintf('Task: Provide SEO keywords for a %s.', $post_type !== '' ? $post_type : 'post'),
-        'Constraints: 5-8 concise comma-separated keywords/phrases; no hashtags; no duplication; avoid stop-words.',
+        'Constraints: 3-8 concise comma-separated keywords/phrases; no hashtags; no duplication; avoid stop-words.',
         'Context: ' . ($context_line !== '' ? $context_line : 'No additional context provided'),
         'Output: plain text, comma-separated.'
     ];
@@ -700,6 +714,7 @@ function hr_sa_ai_generate(string $type, array $context, array $settings)
             'model'       => '',
             'temperature' => null,
             'max_tokens'  => null,
+            'tokens_used' => null,
         ]);
 
         return new WP_Error('hr_sa_ai_disabled', $message);
@@ -722,6 +737,7 @@ function hr_sa_ai_generate(string $type, array $context, array $settings)
             'model'       => '',
             'temperature' => null,
             'max_tokens'  => null,
+            'tokens_used' => null,
         ]);
 
         return new WP_Error('hr_sa_ai_missing_key', $message);
@@ -785,6 +801,7 @@ function hr_sa_ai_generate(string $type, array $context, array $settings)
             'temperature' => $temperature,
             'max_tokens'  => $max_tokens_setting,
             'post_id'     => $post_id,
+            'tokens_used' => $tokens_used,
         ]);
 
         return new WP_Error('hr_sa_http_error', $message);
@@ -805,10 +822,13 @@ function hr_sa_ai_generate(string $type, array $context, array $settings)
             'temperature' => $temperature,
             'max_tokens'  => $max_tokens_setting,
             'post_id'     => $post_id,
+            'tokens_used' => null,
         ]);
 
         return new WP_Error('hr_sa_ai_invalid_response', $message);
     }
+
+    $tokens_used = isset($data['usage']['total_tokens']) ? (int) $data['usage']['total_tokens'] : null;
 
     if ($status < 200 || $status >= 300) {
         $error_message = '';
@@ -826,6 +846,7 @@ function hr_sa_ai_generate(string $type, array $context, array $settings)
             'temperature' => $temperature,
             'max_tokens'  => $max_tokens_setting,
             'post_id'     => $post_id,
+            'tokens_used' => $tokens_used,
         ]);
 
         return new WP_Error('hr_sa_http_error', $message);
@@ -843,6 +864,7 @@ function hr_sa_ai_generate(string $type, array $context, array $settings)
             'temperature' => $temperature,
             'max_tokens'  => $max_tokens_setting,
             'post_id'     => $post_id,
+            'tokens_used' => null,
         ]);
 
         return new WP_Error('hr_sa_ai_empty', $message);
@@ -901,6 +923,7 @@ function hr_sa_ai_generate(string $type, array $context, array $settings)
                     'temperature' => $temperature,
                     'max_tokens'  => $max_tokens_setting,
                     'post_id'     => $post_id,
+                    'tokens_used' => $tokens_used,
                 ]);
 
                 return new WP_Error('hr_sa_ai_keywords_insufficient', $message);
@@ -926,6 +949,7 @@ function hr_sa_ai_generate(string $type, array $context, array $settings)
             'temperature' => $temperature,
             'max_tokens'  => $max_tokens_setting,
             'post_id'     => $post_id,
+            'tokens_used' => $tokens_used,
         ]);
 
         return new WP_Error('hr_sa_ai_empty', $message);
@@ -953,6 +977,7 @@ function hr_sa_ai_generate(string $type, array $context, array $settings)
         'temperature' => $temperature,
         'max_tokens'  => $max_tokens_setting,
         'post_id'     => $post_id,
+        'tokens_used' => $tokens_used,
     ]);
 
     return $output;
@@ -1003,6 +1028,7 @@ function hr_sa_ai_normalize_request_summary(array $summary): array
         'temperature' => null,
         'max_tokens'  => null,
         'post_id'     => 0,
+        'tokens_used' => null,
     ];
 
     $summary = array_merge($defaults, array_intersect_key($summary, $defaults));
@@ -1020,6 +1046,7 @@ function hr_sa_ai_normalize_request_summary(array $summary): array
     $summary['temperature'] = $summary['temperature'] !== null ? (float) $summary['temperature'] : null;
     $summary['max_tokens'] = $summary['max_tokens'] !== null ? max(0, (int) $summary['max_tokens']) : null;
     $summary['post_id'] = (int) $summary['post_id'];
+    $summary['tokens_used'] = $summary['tokens_used'] !== null ? max(0, (int) $summary['tokens_used']) : null;
 
     return $summary;
 }

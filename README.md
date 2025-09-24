@@ -1,20 +1,20 @@
 # HR SEO Assistant
 
-**Version:** 0.2.0
+**Version:** 0.3.0
 **Author:** Himalayan Rides  
 **Description:** HR SEO Assistant unifies Open Graph, Twitter Cards, and JSON-LD schema under one modular framework. Built for portability and clarity, it integrates with the HR Media Help hero system and provides a debug page for validation. Future phases will add AI-assisted SEO enhancements.
 
 ---
 
 ## Features
-- Shared context provider (`hrsa_get_context()`)
-- Open Graph + Twitter card generator
-- JSON-LD (@graph) module integration
-- Sitewide fallback image with CDN presets
-- Title templates for Trips & Pages
-- Settings page with Media Picker, toggles, and preview
-- Debug mode with dedicated debug page
-- Respect/Force mode for SEO plugin conflicts
+- Shared context provider (`hr_sa_get_context()`)
+- Modular toggles for JSON-LD, Open Graph & Twitter Cards, AI Assist, and Debug Mode
+- Conflict-aware Open Graph & Twitter emitters with social image resolver
+- Schema.org JSON-LD emitters for trips, FAQs, itineraries, organization, and vehicles
+- Per-page social overrides (image & description) with admin bar source badge
+- AI-assisted title, description, and keyword generation guided by an instruction field
+- Settings page with media picker, conflict mode, locale, site identity, and AI configuration
+- Debug mode with current context, module states, and AI token usage
 
 ---
 
