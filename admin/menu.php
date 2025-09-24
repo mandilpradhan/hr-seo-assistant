@@ -110,7 +110,7 @@ function hr_sa_enqueue_admin_assets(string $hook_suffix): void
     wp_enqueue_script(
         'hr-sa-admin',
         HR_SA_PLUGIN_URL . 'assets/admin.js',
-        ['wp-i18n'],
+        ['wp-i18n', 'media-editor'],
         HR_SA_VERSION,
         true
     );

@@ -27,6 +27,8 @@ function hr_sa_render_settings_page(): void
     $tpl_page      = (string) hr_sa_get_setting('hr_sa_tpl_page');
     $brand_suffix  = (bool) hr_sa_get_setting('hr_sa_tpl_page_brand_suffix');
     $locale        = (string) hr_sa_get_setting('hr_sa_locale');
+    $locale_choices = hr_sa_get_locale_choices();
+    $is_custom_locale = $locale !== '' && !array_key_exists($locale, $locale_choices);
     $site_name     = (string) hr_sa_get_setting('hr_sa_site_name', get_bloginfo('name'));
     $twitter       = (string) hr_sa_get_setting('hr_sa_twitter_handle');
     $image_preset  = (string) get_option('hr_sa_image_preset', hr_sa_get_settings_defaults()['hr_sa_image_preset']);
@@ -85,10 +87,34 @@ function hr_sa_render_settings_page(): void
                         </td>
                     </tr>
                     <tr>
-                        <th scope="row"><label for="hr_sa_locale"><?php esc_html_e('Locale', HR_SA_TEXT_DOMAIN); ?></label></th>
+                        <th scope="row"><label for="hr_sa_locale_selector"><?php esc_html_e('Locale', HR_SA_TEXT_DOMAIN); ?></label></th>
                         <td>
-                            <input type="text" id="hr_sa_locale" name="hr_sa_locale" value="<?php echo esc_attr($locale); ?>" class="regular-text" />
-                            <p class="description"><?php esc_html_e('Format: xx_XX (e.g., en_US).', HR_SA_TEXT_DOMAIN); ?></p>
+                            <select
+                                id="hr_sa_locale_selector"
+                                class="hr-sa-locale-selector"
+                                data-hidden-input="hr_sa_locale_value"
+                                data-custom-input="hr_sa_locale_custom"
+                                data-custom-value="__hr_sa_custom__"
+                            >
+                                <?php foreach ($locale_choices as $code => $label) : ?>
+                                    <option value="<?php echo esc_attr($code); ?>"<?php echo selected(!$is_custom_locale && $locale === $code, true, false); ?>>
+                                        <?php echo esc_html($label); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                                <option value="__hr_sa_custom__" <?php selected($is_custom_locale); ?>>
+                                    <?php esc_html_e('Custom locale…', HR_SA_TEXT_DOMAIN); ?>
+                                </option>
+                            </select>
+                            <input type="hidden" id="hr_sa_locale_value" class="hr-sa-locale-hidden" name="hr_sa_locale" value="<?php echo esc_attr($locale); ?>" />
+                            <input
+                                type="text"
+                                id="hr_sa_locale_custom"
+                                class="regular-text hr-sa-locale-custom <?php echo $is_custom_locale ? '' : 'hr-sa-hidden'; ?>"
+                                value="<?php echo esc_attr($locale); ?>"
+                                placeholder="xx_XX"
+                                aria-label="<?php echo esc_attr__('Custom locale value', HR_SA_TEXT_DOMAIN); ?>"
+                            />
+                            <p class="description"><?php esc_html_e('Choose a locale or enter a custom value in the format xx_XX (e.g., en_US).', HR_SA_TEXT_DOMAIN); ?></p>
                         </td>
                     </tr>
                     <tr>
