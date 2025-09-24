@@ -34,6 +34,27 @@ function hr_sa_get_settings_defaults(): array
 }
 
 /**
+ * Provide a curated list of common locale choices for the settings UI.
+ *
+ * @return array<string, string> Map of locale code to human readable label.
+ */
+function hr_sa_get_locale_choices(): array
+{
+    return [
+        'en_US' => __('English (United States)', HR_SA_TEXT_DOMAIN),
+        'en_GB' => __('English (United Kingdom)', HR_SA_TEXT_DOMAIN),
+        'es_ES' => __('Spanish (Spain)', HR_SA_TEXT_DOMAIN),
+        'fr_FR' => __('French (France)', HR_SA_TEXT_DOMAIN),
+        'de_DE' => __('German (Germany)', HR_SA_TEXT_DOMAIN),
+        'hi_IN' => __('Hindi (India)', HR_SA_TEXT_DOMAIN),
+        'ne_NP' => __('Nepali (Nepal)', HR_SA_TEXT_DOMAIN),
+        'it_IT' => __('Italian (Italy)', HR_SA_TEXT_DOMAIN),
+        'th_TH' => __('Thai (Thailand)', HR_SA_TEXT_DOMAIN),
+        'zh_CN' => __('Chinese (Simplified)', HR_SA_TEXT_DOMAIN),
+    ];
+}
+
+/**
  * Seed default settings if they do not exist.
  */
 function hr_sa_settings_initialize_defaults(): void
@@ -281,8 +302,18 @@ function hr_sa_settings_admin_notices(): void
         return;
     }
 
-    if (isset($_GET['settings-updated']) && $_GET['settings-updated']) {
+    $updated_flag = isset($_GET['settings-updated'])
+        ? sanitize_text_field(wp_unslash((string) $_GET['settings-updated']))
+        : '';
+
+    if ($updated_flag === 'true' || $updated_flag === '1') {
         add_settings_error('hr_sa_settings', 'hr_sa_settings_saved', __('Settings saved.', HR_SA_TEXT_DOMAIN), 'updated');
+    } elseif ($updated_flag === 'false' || $updated_flag === '0') {
+        add_settings_error(
+            'hr_sa_settings',
+            'hr_sa_settings_failed',
+            __('Settings could not be saved. Please review the fields below and try again.', HR_SA_TEXT_DOMAIN)
+        );
     }
 
     settings_errors('hr_sa_settings');
