@@ -33,6 +33,7 @@ function hr_sa_get_settings_defaults(): array
         'hr_sa_image_url_suffix_find'    => '',
         'hr_sa_image_url_suffix_replace' => '',
         'hr_sa_conflict_mode'            => 'respect',
+        'hr_sa_admin_bar_badge_enabled'  => '0',
         'hr_sa_debug_enabled'            => '0',
         'hr_sa_ai_enabled'               => '0',
         'hr_sa_ai_instruction'           => '',
@@ -155,18 +156,6 @@ function hr_sa_register_settings(): void
         'default'           => hr_sa_get_settings_defaults()['hr_sa_image_url_suffix_replace'],
     ]);
 
-    register_setting('hr_sa_settings', 'hr_sa_og_enabled', [
-        'type'              => 'boolean',
-        'sanitize_callback' => 'hr_sa_sanitize_checkbox',
-        'default'           => '1',
-    ]);
-
-    register_setting('hr_sa_settings', 'hr_sa_ai_enabled', [
-        'type'              => 'boolean',
-        'sanitize_callback' => 'hr_sa_sanitize_checkbox',
-        'default'           => hr_sa_get_settings_defaults()['hr_sa_ai_enabled'],
-    ]);
-
     register_setting('hr_sa_settings', 'hr_sa_ai_instruction', [
         'type'              => 'string',
         'sanitize_callback' => 'hr_sa_sanitize_ai_instruction',
@@ -201,6 +190,12 @@ function hr_sa_register_settings(): void
         'type'              => 'string',
         'sanitize_callback' => 'hr_sa_sanitize_conflict_mode',
         'default'           => hr_sa_get_settings_defaults()['hr_sa_conflict_mode'],
+    ]);
+
+    register_setting('hr_sa_settings', 'hr_sa_admin_bar_badge_enabled', [
+        'type'              => 'boolean',
+        'sanitize_callback' => 'hr_sa_sanitize_checkbox',
+        'default'           => hr_sa_get_settings_defaults()['hr_sa_admin_bar_badge_enabled'],
     ]);
 
     register_setting('hr_sa_settings', 'hr_sa_debug_enabled', [
@@ -405,7 +400,7 @@ function hr_sa_get_setting(string $option, $default = null)
     $default = $default ?? ($defaults[$option] ?? '');
     $value = get_option($option, $default);
 
-    if (in_array($option, ['hr_sa_tpl_page_brand_suffix', 'hr_sa_debug_enabled', 'hr_sa_og_enabled', 'hr_sa_image_url_replace_enabled', 'hr_sa_ai_enabled'], true)) {
+    if (in_array($option, ['hr_sa_tpl_page_brand_suffix', 'hr_sa_admin_bar_badge_enabled', 'hr_sa_debug_enabled', 'hr_sa_og_enabled', 'hr_sa_image_url_replace_enabled', 'hr_sa_ai_enabled'], true)) {
         return $value === '1' || $value === 1 || $value === true;
     }
 
@@ -464,6 +459,7 @@ function hr_sa_get_all_settings(): array
     }
 
     $settings['hr_sa_tpl_page_brand_suffix'] = hr_sa_get_setting('hr_sa_tpl_page_brand_suffix');
+    $settings['hr_sa_admin_bar_badge_enabled'] = hr_sa_get_setting('hr_sa_admin_bar_badge_enabled');
     $settings['hr_sa_debug_enabled'] = hr_sa_get_setting('hr_sa_debug_enabled');
     $settings['hr_sa_og_enabled'] = hr_sa_is_flag_enabled('hr_sa_og_enabled', true);
     $settings['hr_sa_image_url_replace_enabled'] = hr_sa_get_setting('hr_sa_image_url_replace_enabled');
