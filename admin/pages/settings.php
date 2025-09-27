@@ -174,16 +174,16 @@ function hr_sa_render_settings_page(): void
                                 </label>
                                 <p class="description hr-sa-ai-hint"><?php esc_html_e('Admin-only. No front-end API calls will ever occur.', HR_SA_TEXT_DOMAIN); ?></p>
                                 <div class="hr-sa-ai-settings">
-                                    <div class="hr-sa-ai-settings__field">
+                                    <div class="hr-sa-ai-settings__field hr-sa-ai-settings__field--full">
                                         <label for="hr_sa_ai_api_key"><?php esc_html_e('API Key', HR_SA_TEXT_DOMAIN); ?></label>
                                         <input type="password" id="hr_sa_ai_api_key" name="hr_sa_ai_api_key" value="<?php echo esc_attr($ai_has_key ? $ai_key_masked : ''); ?>" class="regular-text" autocomplete="off" />
                                     </div>
-                                    <div class="hr-sa-ai-settings__field">
+                                    <div class="hr-sa-ai-settings__field hr-sa-ai-settings__field--full">
                                         <label for="hr_sa_ai_global_instructions"><?php esc_html_e('Global AI Instructions', HR_SA_TEXT_DOMAIN); ?></label>
                                         <textarea id="hr_sa_ai_global_instructions" name="hr_sa_ai_global_instructions" rows="5" class="large-text code"><?php echo esc_textarea($ai_global_instructions); ?></textarea>
                                         <p class="description"><?php esc_html_e('Optional guidance sent with every AI request. Use this to enforce tone, disclaimers, or topics to avoid.', HR_SA_TEXT_DOMAIN); ?></p>
                                     </div>
-                                    <div class="hr-sa-ai-settings__field">
+                                    <div class="hr-sa-ai-settings__field hr-sa-ai-settings__field--full">
                                         <label for="hr_sa_ai_model"><?php esc_html_e('Model', HR_SA_TEXT_DOMAIN); ?></label>
                                         <input type="text" id="hr_sa_ai_model" name="hr_sa_ai_model" value="<?php echo esc_attr($ai_model); ?>" class="regular-text" />
                                         <p class="description"><?php esc_html_e('Provider-specific identifier (e.g., gpt-4o-mini). Choose a model that supports chat completions.', HR_SA_TEXT_DOMAIN); ?></p>

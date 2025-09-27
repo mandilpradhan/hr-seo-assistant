@@ -118,7 +118,11 @@
     display: grid;
     gap: 12px;
     margin: 12px 0;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.hr-sa-ai-settings__field--full {
+    grid-column: 1 / -1;
 }
 
 .hr-sa-ai-settings__field label {
@@ -142,6 +146,12 @@
 
 .hr-sa-ai-test-result[data-state="error"] {
     color: #b32d2e;
+}
+
+@media (max-width: 782px) {
+    .hr-sa-ai-settings {
+        grid-template-columns: 1fr;
+    }
 }
 
 .hr-sa-btn-loading {
