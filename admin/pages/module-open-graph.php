@@ -36,12 +36,22 @@ function hr_sa_open_graph_preview_build_targets(): array
 
     $capped = false;
 
-    $post_type_objects = get_post_types(['public' => true], 'objects');
-    if (isset($post_type_objects['attachment'])) {
-        unset($post_type_objects['attachment']);
-    }
+    $allowed_post_types = ['post', 'page', 'trip'];
+    $post_type_objects  = [];
+    $post_types         = [];
 
-    $post_types = array_keys($post_type_objects);
+    foreach ($allowed_post_types as $post_type_slug) {
+        if (!post_type_exists($post_type_slug)) {
+            continue;
+        }
+
+        $post_types[] = $post_type_slug;
+
+        $post_type_object = get_post_type_object($post_type_slug);
+        if ($post_type_object instanceof WP_Post_Type) {
+            $post_type_objects[$post_type_slug] = $post_type_object;
+        }
+    }
 
     if ($post_types) {
         $query = new WP_Query([
