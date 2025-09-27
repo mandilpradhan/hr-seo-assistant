@@ -81,15 +81,23 @@
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
 
-        const thKey = document.createElement('th');
-        thKey.scope = 'col';
-        thKey.textContent = getMessage('tableKey', __('Property', 'hr-seo-assistant'));
+        const thType = document.createElement('th');
+        thType.scope = 'col';
+        thType.textContent = getMessage('tableType', __('Type', 'hr-seo-assistant'));
+
+        const thProperty = document.createElement('th');
+        thProperty.scope = 'col';
+        thProperty.textContent = getMessage(
+            'tableProperty',
+            getMessage('tableKey', __('Property', 'hr-seo-assistant'))
+        );
 
         const thValue = document.createElement('th');
         thValue.scope = 'col';
         thValue.textContent = getMessage('tableValue', __('Value', 'hr-seo-assistant'));
 
-        headerRow.appendChild(thKey);
+        headerRow.appendChild(thType);
+        headerRow.appendChild(thProperty);
         headerRow.appendChild(thValue);
         thead.appendChild(headerRow);
         table.appendChild(thead);
@@ -101,20 +109,24 @@
                 return;
             }
 
-            const label = typeof row.label === 'string' ? row.label : '';
+            const type = typeof row.type === 'string' ? row.type : '';
+            const property = typeof row.property === 'string' ? row.property : '';
             const value = typeof row.value === 'string' ? row.value : '';
 
             const tr = document.createElement('tr');
 
-            const th = document.createElement('th');
-            th.scope = 'row';
-            th.textContent = label;
+            const tdType = document.createElement('td');
+            tdType.textContent = type;
 
-            const td = document.createElement('td');
-            td.textContent = value;
+            const tdProperty = document.createElement('td');
+            tdProperty.textContent = property;
 
-            tr.appendChild(th);
-            tr.appendChild(td);
+            const tdValue = document.createElement('td');
+            tdValue.textContent = value;
+
+            tr.appendChild(tdType);
+            tr.appendChild(tdProperty);
+            tr.appendChild(tdValue);
             tbody.appendChild(tr);
         });
 
