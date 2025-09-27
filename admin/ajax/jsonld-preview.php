@@ -169,43 +169,222 @@ function hr_sa_jsonld_preview_prepare_context(int $target)
 }
 
 /**
- * Flatten the JSON-LD payload into label/value rows for display.
+ * Flatten the JSON-LD payload into structured rows for display.
  *
- * @param mixed  $data   Data to flatten.
- * @param string $prefix Current property path.
+ * @param mixed $data Data to flatten.
  *
- * @return array<int, array{label: string, value: string}>
+ * @return array<int, array{type: string, property: string, value: string}>
  */
-function hr_sa_jsonld_preview_flatten($data, string $prefix = ''): array
+function hr_sa_jsonld_preview_flatten($data): array
 {
-    $rows = [];
-
     if (is_object($data)) {
         $data = (array) $data;
     }
 
-    if (is_array($data)) {
-        $is_assoc = array_keys($data) !== range(0, count($data) - 1);
-        foreach ($data as $key => $value) {
-            $segment = $is_assoc ? (string) $key : '[' . $key . ']';
-            $label   = $prefix === '' ? $segment : $prefix . ' › ' . $segment;
-            $rows    = array_merge($rows, hr_sa_jsonld_preview_flatten($value, $label));
+    $rows = [];
+
+    $decode_value = static function (string $value): string {
+        return wp_specialchars_decode($value, ENT_QUOTES);
+    };
+
+    $humanize_segment = static function (string $segment): string {
+        $segment = trim($segment);
+        if ($segment === '') {
+            return '';
         }
-        return $rows;
+
+        if ($segment[0] === '@') {
+            $segment = substr($segment, 1);
+        }
+
+        if ($segment === '') {
+            return '';
+        }
+
+        if (preg_match('/^\[(\d+)\]$/', $segment, $matches)) {
+            return '#' . ((int) $matches[1] + 1);
+        }
+
+        $segment = (string) preg_replace('/[\\/_\-]+/u', ' ', $segment);
+        $segment = (string) preg_replace('/(?<!^)(?=[A-Z])/u', ' $0', $segment);
+        $segment = (string) preg_replace('/\s+/u', ' ', $segment);
+        $segment = trim($segment);
+
+        if ($segment === '') {
+            return '';
+        }
+
+        $parts = preg_split('/\s+/u', $segment) ?: [];
+        $parts = array_map(
+            static function ($part) {
+                if ($part === '') {
+                    return '';
+                }
+
+                $upper = mb_strtoupper($part, 'UTF-8');
+                if ($upper === $part) {
+                    return $upper;
+                }
+
+                $lower = mb_strtolower($part, 'UTF-8');
+                if ($lower === $part && mb_strlen($part, 'UTF-8') <= 3 && preg_match('/^[a-z]+$/u', $part)) {
+                    return mb_strtoupper($part, 'UTF-8');
+                }
+
+                if ($lower === $part && strpos($part, '.') !== false) {
+                    $first = mb_strtoupper(mb_substr($lower, 0, 1, 'UTF-8'), 'UTF-8');
+                    $rest  = mb_substr($lower, 1, null, 'UTF-8');
+
+                    return $first . $rest;
+                }
+
+                return mb_convert_case($part, MB_CASE_TITLE, 'UTF-8');
+            },
+            $parts
+        );
+
+        return implode(' ', array_filter($parts, static fn ($part) => $part !== ''));
+    };
+
+    $format_property = static function (array $segments) use ($humanize_segment): string {
+        $clean = [];
+        $skip_index = false;
+
+        foreach ($segments as $segment) {
+            if ($segment === '@graph') {
+                $skip_index = true;
+                continue;
+            }
+
+            if ($skip_index && preg_match('/^\[(\d+)\]$/', (string) $segment)) {
+                $skip_index = false;
+                continue;
+            }
+
+            $skip_index = false;
+
+            $formatted = $humanize_segment((string) $segment);
+            if ($formatted !== '') {
+                $clean[] = $formatted;
+            }
+        }
+
+        if (empty($clean)) {
+            return __('Value', HR_SA_TEXT_DOMAIN);
+        }
+
+        return implode(' ', $clean);
+    };
+
+    $normalize_type = static function ($type_value, string $fallback) use ($decode_value, $humanize_segment): string {
+        $values = is_array($type_value) ? $type_value : [$type_value];
+        $labels = [];
+
+        foreach ($values as $value) {
+            if (!is_string($value) || $value === '') {
+                continue;
+            }
+
+            $value = $decode_value($value);
+
+            if (strpos($value, '://') !== false) {
+                $parsed = wp_parse_url($value);
+                if (is_array($parsed)) {
+                    if (!empty($parsed['path'])) {
+                        $value = trim((string) $parsed['path'], '/');
+                    } elseif (!empty($parsed['host'])) {
+                        $value = $parsed['host'];
+                    }
+                }
+            }
+
+            $label = $humanize_segment($value);
+            if ($label !== '') {
+                $labels[] = $label;
+            }
+        }
+
+        if (empty($labels) && $fallback !== '') {
+            return $fallback;
+        }
+
+        if (empty($labels)) {
+            return '';
+        }
+
+        $labels = array_values(array_unique($labels));
+
+        return implode(', ', $labels);
+    };
+
+    $context_type = '';
+    if (is_array($data) && array_key_exists('@context', $data)) {
+        $context_type = $normalize_type($data['@context'], '');
     }
 
-    if (is_bool($data)) {
-        $value = $data ? __('true', HR_SA_TEXT_DOMAIN) : __('false', HR_SA_TEXT_DOMAIN);
-    } elseif ($data === null) {
-        $value = __('null', HR_SA_TEXT_DOMAIN);
-    } else {
-        $value = (string) $data;
-    }
+    $walker = static function ($item, array $path, string $current_type) use (
+        &$walker,
+        &$rows,
+        $format_property,
+        $normalize_type,
+        $decode_value,
+        $context_type
+    ): void {
+        if (is_object($item)) {
+            $item = (array) $item;
+        }
 
-    $rows[] = [
-        'label' => $prefix === '' ? __('Value', HR_SA_TEXT_DOMAIN) : $prefix,
-        'value' => $value,
-    ];
+        if (is_array($item)) {
+            $is_assoc = array_keys($item) !== range(0, count($item) - 1);
+
+            if ($is_assoc) {
+                $node_type = $current_type;
+                if (array_key_exists('@type', $item)) {
+                    $node_type = $normalize_type($item['@type'], $context_type);
+                } elseif ($node_type === '') {
+                    $node_type = $context_type;
+                }
+
+                foreach ($item as $key => $value) {
+                    $walker($value, array_merge($path, [(string) $key]), $node_type);
+                }
+
+                return;
+            }
+
+            $next_type = $current_type !== '' ? $current_type : $context_type;
+
+            foreach ($item as $index => $value) {
+                $walker($value, array_merge($path, ['[' . $index . ']']), $next_type);
+            }
+
+            return;
+        }
+
+        $type_label = $current_type !== '' ? $current_type : $context_type;
+
+        if (is_bool($item)) {
+            $value = $item ? __('true', HR_SA_TEXT_DOMAIN) : __('false', HR_SA_TEXT_DOMAIN);
+        } elseif ($item === null) {
+            $value = __('null', HR_SA_TEXT_DOMAIN);
+        } elseif (is_float($item)) {
+            $value = (string) $item;
+        } elseif (is_int($item)) {
+            $value = (string) $item;
+        } elseif (is_string($item)) {
+            $value = $decode_value($item);
+        } else {
+            $value = $decode_value((string) $item);
+        }
+
+        $rows[] = [
+            'type'     => $type_label,
+            'property' => $format_property($path),
+            'value'    => $value,
+        ];
+    };
+
+    $walker($data, [], $context_type);
 
     return $rows;
 }
