@@ -226,7 +226,7 @@ function hr_sa_jsonld_preview_build_targets(): array
     $recent     = get_posts([
         'post_type'      => $post_types,
         'post_status'    => 'publish',
-        'numberposts'    => 12,
+        'numberposts'    => 100,
         'orderby'        => 'date',
         'order'          => 'DESC',
         'suppress_filters' => true,
