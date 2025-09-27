@@ -121,6 +121,13 @@ Rename MU files back to `*.php` so production behavior is unchanged until we shi
 - **Debug** page shows JSON-LD module enabled, OG disabled.
 - No PHP notices/fatals in error logs during page loads.
 
+---
+
+## Regression — JSON-LD preview Type labels
+1. Navigate to **HR SEO → JSON-LD Preview**.
+2. Trigger a preview for any page and focus on the **Type** column.
+3. Confirm that entries whose context or type equals `https://schema.org/` now display as **Schema.org** (humanized host) instead of showing a blank label.
+
 ✅ **Phase 0 is complete** when:
 - JSON-LD parity is verified on the three page types.
 - Admin UI & Debug behave correctly.

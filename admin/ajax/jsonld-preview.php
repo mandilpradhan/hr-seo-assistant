@@ -286,26 +286,57 @@ function hr_sa_jsonld_preview_flatten($data): array
             }
 
             $value = $decode_value($value);
+            $candidate = $value;
+            $parsed_host = '';
 
             if (strpos($value, '://') !== false) {
                 $parsed = wp_parse_url($value);
                 if (is_array($parsed)) {
-                    if (!empty($parsed['path'])) {
-                        $value = trim((string) $parsed['path'], '/');
-                    } elseif (!empty($parsed['host'])) {
-                        $value = $parsed['host'];
+                    $parsed_host = isset($parsed['host']) ? (string) $parsed['host'] : '';
+                    $path = isset($parsed['path']) ? trim((string) $parsed['path'], '/') : '';
+
+                    if ($path !== '') {
+                        $candidate = $path;
+                    } elseif ($parsed_host !== '') {
+                        $candidate = $parsed_host;
+                    } elseif ($fallback !== '') {
+                        $candidate = $fallback;
+                    } else {
+                        $candidate = '';
                     }
                 }
             }
 
-            $label = $humanize_segment($value);
+            if ($candidate === '' && $fallback !== '') {
+                $candidate = $fallback;
+            }
+
+            if ($candidate === '') {
+                continue;
+            }
+
+            $label = $humanize_segment($candidate);
+            if ($label === '' && $parsed_host !== '') {
+                $label = $humanize_segment($parsed_host);
+                if ($label === '') {
+                    $label = $parsed_host;
+                }
+            }
+
+            if ($label === '' && $fallback !== '') {
+                $fallback_label = $humanize_segment($fallback);
+                $label = $fallback_label !== '' ? $fallback_label : $fallback;
+            }
+
             if ($label !== '') {
                 $labels[] = $label;
             }
         }
 
         if (empty($labels) && $fallback !== '') {
-            return $fallback;
+            $fallback_label = $humanize_segment($fallback);
+
+            return $fallback_label !== '' ? $fallback_label : $fallback;
         }
 
         if (empty($labels)) {
