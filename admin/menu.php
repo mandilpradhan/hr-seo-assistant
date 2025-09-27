@@ -211,7 +211,18 @@ function hr_sa_jsonld_preview_build_targets(): array
 
     $seen = [0 => true];
 
-    $post_types = ['post', 'trip', 'page'];
+    $post_types = [
+        'post',
+        'page',
+        'trip',
+        'bike',
+        'guide',
+        'itinerary',
+        'faq',
+        'additional',
+        'stopovers',
+        'testimonial',
+    ];
     $recent     = get_posts([
         'post_type'      => $post_types,
         'post_status'    => 'publish',
