@@ -15,6 +15,8 @@
     var select = container.querySelector('#hr_sa_og_preview_target');
     var statusEl = container.querySelector('.hr-sa-og-preview__status');
     var tableBody = container.querySelector('[data-hr-sa-og-preview-table]');
+    var imageFigure = container.querySelector('[data-hr-sa-og-preview-image]');
+    var imageEl = imageFigure ? imageFigure.querySelector('img') : null;
     var placeholderImage = typeof data.placeholderImage === 'string' ? data.placeholderImage : '';
     var tableConfig = Array.isArray(data.table) ? data.table : [];
     var targets = Array.isArray(data.targets) ? data.targets : [];
@@ -33,43 +35,16 @@
         });
     }
 
-    var cards = Array.prototype.slice.call(container.querySelectorAll('.hr-sa-og-card')).map(function (element) {
-        var imageEl = element.querySelector('.hr-sa-og-card__image');
-        if (imageEl && placeholderImage) {
-            imageEl.addEventListener('error', function () {
-                if (imageEl.src !== placeholderImage) {
-                    imageEl.src = placeholderImage;
-                }
-            });
-        }
-
-        return {
-            element: element,
-            platform: element.getAttribute('data-platform') || '',
-            image: imageEl,
-            title: element.querySelector('.hr-sa-og-card__title'),
-            description: element.querySelector('.hr-sa-og-card__description'),
-            site: element.querySelector('.hr-sa-og-card__site'),
-            url: element.querySelector('.hr-sa-og-card__url')
-        };
-    });
+    if (imageEl && placeholderImage) {
+        imageEl.addEventListener('error', function () {
+            if (placeholderImage && imageEl.src !== placeholderImage) {
+                imageEl.src = placeholderImage;
+            }
+        });
+    }
 
     function clean(value) {
         return typeof value === 'string' ? value : '';
-    }
-
-    function formatUrl(url) {
-        var cleanUrl = clean(url);
-        if (!cleanUrl) {
-            return '';
-        }
-
-        try {
-            var parsed = new window.URL(cleanUrl);
-            return parsed.host + parsed.pathname;
-        } catch (error) {
-            return cleanUrl.replace(/^https?:\/\//i, '');
-        }
     }
 
     function setStatus(message) {
@@ -85,88 +60,44 @@
         container.setAttribute('aria-busy', isLoading ? 'true' : 'false');
     }
 
-    function ensurePlaceholder(imageEl, source) {
-        if (!imageEl) {
+    function ensurePlaceholder(image, source, altText) {
+        if (!image) {
             return;
         }
 
         if (source) {
-            imageEl.src = source;
+            image.src = source;
         } else if (placeholderImage) {
-            imageEl.src = placeholderImage;
+            image.src = placeholderImage;
         } else {
-            imageEl.removeAttribute('src');
+            image.removeAttribute('src');
         }
 
-        imageEl.alt = data.strings && data.strings.imageAlt ? data.strings.imageAlt : '';
+        image.alt = altText || (data.strings && data.strings.imageAlt ? data.strings.imageAlt : '');
     }
 
-    function updateCard(card, payload) {
-        if (!card) {
-            return;
-        }
-
-        var titleValue = clean(payload.title);
-        var descriptionValue = clean(payload.description);
-        var siteValue = clean(payload.site);
-        var urlValue = clean(payload.url);
-        var imageValue = clean(payload.image);
-
-        if (card.title) {
-            card.title.textContent = titleValue || (data.strings && data.strings.notSet ? data.strings.notSet : '');
-        }
-
-        if (card.description) {
-            card.description.textContent = descriptionValue || (data.strings && data.strings.notSet ? data.strings.notSet : '');
-        }
-
-        if (card.site) {
-            card.site.textContent = siteValue || (data.strings && data.strings.notSet ? data.strings.notSet : '');
-        }
-
-        if (card.url) {
-            card.url.textContent = urlValue ? formatUrl(urlValue) : (data.strings && data.strings.notSet ? data.strings.notSet : '');
-        }
-
-        if (card.image) {
-            ensurePlaceholder(card.image, imageValue || '');
-        }
-    }
-
-    function updateCards(snapshot) {
+    function resolveImageSource(snapshot) {
         var fields = snapshot.fields || {};
         var og = snapshot.og || {};
         var twitter = snapshot.twitter || {};
 
-        var baseTitle = clean(fields.title);
-        var baseDescription = clean(fields.description);
-        var baseUrl = clean(fields.url);
-        var baseImage = clean(fields.image);
-        var baseSite = clean(fields.site_name);
-        var twitterHandle = clean(fields.twitter_handle);
-        var twitterTitle = clean(twitter['twitter:title']) || baseTitle;
-        var twitterDescription = clean(twitter['twitter:description']) || baseDescription;
-        var twitterImage = clean(twitter['twitter:image']) || baseImage;
-        var cardType = clean(twitter['twitter:card']);
+        return clean(fields.image) || clean(og['og:image']) || clean(twitter['twitter:image']);
+    }
 
-        cards.forEach(function (card) {
-            var payload = {
-                title: baseTitle,
-                description: baseDescription,
-                site: baseSite,
-                url: baseUrl,
-                image: baseImage
-            };
+    function updateImage(snapshot) {
+        if (!imageEl) {
+            return;
+        }
 
-            if (card.platform === 'twitter') {
-                payload.title = twitterTitle;
-                payload.description = twitterDescription;
-                payload.image = twitterImage;
-                payload.site = twitterHandle || baseSite || cardType;
-            }
+        var fields = snapshot.fields || {};
+        var imageSource = resolveImageSource(snapshot);
+        var altText = clean(fields.title) || clean(fields.site_name) || (data.strings && data.strings.imageAlt ? data.strings.imageAlt : '');
 
-            updateCard(card, payload);
-        });
+        ensurePlaceholder(imageEl, imageSource, altText);
+
+        if (imageFigure) {
+            imageFigure.classList.toggle('has-image', Boolean(imageSource));
+        }
     }
 
     function updateTable(fields) {
@@ -237,7 +168,7 @@
             }
 
             var result = payload.data;
-            updateCards(result);
+            updateImage(result);
             updateTable(result.fields || {});
 
             var messages = [];
@@ -251,10 +182,6 @@
 
             if (!result.twitter_enabled && data.strings && data.strings.twitterDisabled) {
                 messages.push(data.strings.twitterDisabled);
-            }
-
-            if (result.twitter && result.twitter['twitter:card'] && data.strings && data.strings.cardType) {
-                messages.push(data.strings.cardType.replace('%s', result.twitter['twitter:card']));
             }
 
             if (!messages.length && data.strings && data.strings.ready) {

@@ -230,92 +230,10 @@ function hr_sa_render_module_open_graph_page(): void
                     <?php endif; ?>
                 </div>
                 <div class="hr-sa-og-preview__status" aria-live="polite"></div>
-                <div class="hr-sa-og-preview__grid" data-hr-sa-og-preview-grid>
-                    <article class="hr-sa-og-card hr-sa-og-card--facebook" data-platform="facebook">
-                        <header class="hr-sa-og-card__header"><?php esc_html_e('Facebook (OG)', HR_SA_TEXT_DOMAIN); ?></header>
-                        <div class="hr-sa-og-card__media">
-                            <img src="" alt="" loading="lazy" class="hr-sa-og-card__image" />
-                        </div>
-                        <div class="hr-sa-og-card__body">
-                            <div class="hr-sa-og-card__meta">
-                                <span class="hr-sa-og-card__site"></span>
-                                <span class="hr-sa-og-card__url"></span>
-                            </div>
-                            <h3 class="hr-sa-og-card__title"></h3>
-                            <p class="hr-sa-og-card__description"></p>
-                        </div>
-                    </article>
-                    <article class="hr-sa-og-card hr-sa-og-card--linkedin" data-platform="linkedin">
-                        <header class="hr-sa-og-card__header"><?php esc_html_e('LinkedIn (OG)', HR_SA_TEXT_DOMAIN); ?></header>
-                        <div class="hr-sa-og-card__media">
-                            <img src="" alt="" loading="lazy" class="hr-sa-og-card__image" />
-                        </div>
-                        <div class="hr-sa-og-card__body">
-                            <div class="hr-sa-og-card__meta">
-                                <span class="hr-sa-og-card__site"></span>
-                                <span class="hr-sa-og-card__url"></span>
-                            </div>
-                            <h3 class="hr-sa-og-card__title"></h3>
-                            <p class="hr-sa-og-card__description"></p>
-                        </div>
-                    </article>
-                    <article class="hr-sa-og-card hr-sa-og-card--twitter" data-platform="twitter">
-                        <header class="hr-sa-og-card__header"><?php esc_html_e('Twitter / X (Twitter Card)', HR_SA_TEXT_DOMAIN); ?></header>
-                        <div class="hr-sa-og-card__media">
-                            <img src="" alt="" loading="lazy" class="hr-sa-og-card__image" />
-                        </div>
-                        <div class="hr-sa-og-card__body">
-                            <div class="hr-sa-og-card__meta">
-                                <span class="hr-sa-og-card__site"></span>
-                                <span class="hr-sa-og-card__url"></span>
-                            </div>
-                            <h3 class="hr-sa-og-card__title"></h3>
-                            <p class="hr-sa-og-card__description"></p>
-                        </div>
-                    </article>
-                    <article class="hr-sa-og-card hr-sa-og-card--discord" data-platform="discord">
-                        <header class="hr-sa-og-card__header"><?php esc_html_e('Discord (OG embed)', HR_SA_TEXT_DOMAIN); ?></header>
-                        <div class="hr-sa-og-card__media">
-                            <img src="" alt="" loading="lazy" class="hr-sa-og-card__image" />
-                        </div>
-                        <div class="hr-sa-og-card__body">
-                            <div class="hr-sa-og-card__meta">
-                                <span class="hr-sa-og-card__site"></span>
-                                <span class="hr-sa-og-card__url"></span>
-                            </div>
-                            <h3 class="hr-sa-og-card__title"></h3>
-                            <p class="hr-sa-og-card__description"></p>
-                        </div>
-                    </article>
-                    <article class="hr-sa-og-card hr-sa-og-card--slack" data-platform="slack">
-                        <header class="hr-sa-og-card__header"><?php esc_html_e('Slack (OG)', HR_SA_TEXT_DOMAIN); ?></header>
-                        <div class="hr-sa-og-card__media">
-                            <img src="" alt="" loading="lazy" class="hr-sa-og-card__image" />
-                        </div>
-                        <div class="hr-sa-og-card__body">
-                            <div class="hr-sa-og-card__meta">
-                                <span class="hr-sa-og-card__site"></span>
-                                <span class="hr-sa-og-card__url"></span>
-                            </div>
-                            <h3 class="hr-sa-og-card__title"></h3>
-                            <p class="hr-sa-og-card__description"></p>
-                        </div>
-                    </article>
-                    <article class="hr-sa-og-card hr-sa-og-card--whatsapp" data-platform="whatsapp">
-                        <header class="hr-sa-og-card__header"><?php esc_html_e('WhatsApp (OG)', HR_SA_TEXT_DOMAIN); ?></header>
-                        <div class="hr-sa-og-card__media">
-                            <img src="" alt="" loading="lazy" class="hr-sa-og-card__image" />
-                        </div>
-                        <div class="hr-sa-og-card__body">
-                            <div class="hr-sa-og-card__meta">
-                                <span class="hr-sa-og-card__site"></span>
-                                <span class="hr-sa-og-card__url"></span>
-                            </div>
-                            <h3 class="hr-sa-og-card__title"></h3>
-                            <p class="hr-sa-og-card__description"></p>
-                        </div>
-                    </article>
-                </div>
+                <figure class="hr-sa-og-preview__image" data-hr-sa-og-preview-image>
+                    <img src="" alt="" loading="lazy" width="600" height="315" />
+                    <figcaption class="hr-sa-og-preview__image-caption"><?php esc_html_e('Preview image (600×315)', HR_SA_TEXT_DOMAIN); ?></figcaption>
+                </figure>
                 <table class="widefat fixed striped hr-sa-og-preview__table">
                     <thead>
                         <tr>
