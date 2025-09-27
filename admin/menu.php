@@ -18,6 +18,7 @@ require_once HR_SA_PLUGIN_DIR . 'admin/pages/module-open-graph.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/pages/module-ai.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/pages/debug.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/ajax/ai.php';
+require_once HR_SA_PLUGIN_DIR . 'admin/ajax/jsonld-preview.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/ajax/modules.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/meta-boxes/ai.php';
 
@@ -94,6 +95,7 @@ function hr_sa_enqueue_admin_assets(string $hook_suffix): void
     $is_settings_screen = strpos($hook_suffix, 'hr-sa-settings') !== false;
     $is_social_screen   = strpos($hook_suffix, 'hr-sa-module-open-graph') !== false;
     $is_ai_screen       = strpos($hook_suffix, 'hr-sa-module-ai') !== false;
+    $is_jsonld_screen   = strpos($hook_suffix, 'hr-sa-module-json-ld') !== false;
     $needs_media        = $is_settings_screen || $is_social_screen;
 
     if ($needs_media) {
@@ -119,6 +121,36 @@ function hr_sa_enqueue_admin_assets(string $hook_suffix): void
         HR_SA_VERSION,
         true
     );
+
+    if ($is_jsonld_screen) {
+        wp_register_script(
+            'hr-sa-admin-jsonld',
+            HR_SA_PLUGIN_URL . 'assets/module-jsonld.js',
+            ['wp-i18n'],
+            HR_SA_VERSION,
+            true
+        );
+
+        $preview_data = [
+            'ajaxUrl'       => admin_url('admin-ajax.php'),
+            'nonce'         => wp_create_nonce('hr_sa_jsonld_preview'),
+            'defaultTarget' => 0,
+            'messages'      => [
+                'loading'   => __('Loading preview…', HR_SA_TEXT_DOMAIN),
+                'error'     => __('We could not load the preview. Please try again.', HR_SA_TEXT_DOMAIN),
+                'empty'     => __('No JSON-LD nodes were generated for this selection.', HR_SA_TEXT_DOMAIN),
+                'ready'     => __('Select an item to load its JSON-LD.', HR_SA_TEXT_DOMAIN),
+                'tableKey'  => __('Property', HR_SA_TEXT_DOMAIN),
+                'tableValue'=> __('Value', HR_SA_TEXT_DOMAIN),
+                'jsonEmpty' => __('JSON will appear here after loading a preview.', HR_SA_TEXT_DOMAIN),
+            ],
+            'targets'       => hr_sa_jsonld_preview_build_targets(),
+        ];
+
+        wp_localize_script('hr-sa-admin-jsonld', 'hrSaJsonLdPreview', $preview_data);
+        wp_set_script_translations('hr-sa-admin-jsonld', HR_SA_TEXT_DOMAIN);
+        wp_enqueue_script('hr-sa-admin-jsonld');
+    }
 
     if ($is_settings_screen || $is_ai_screen) {
         $ai_settings_full = hr_sa_get_ai_settings();
@@ -160,4 +192,59 @@ function hr_sa_enqueue_admin_assets(string $hook_suffix): void
     );
 
     wp_set_script_translations('hr-sa-admin', HR_SA_TEXT_DOMAIN);
+}
+
+/**
+ * Build the JSON-LD preview selector data.
+ *
+ * @return array<int, array{id:int,label:string,type:string}>
+ */
+function hr_sa_jsonld_preview_build_targets(): array
+{
+    $targets = [
+        [
+            'id'    => 0,
+            'label' => __('Home', HR_SA_TEXT_DOMAIN),
+            'type'  => __('Front Page', HR_SA_TEXT_DOMAIN),
+        ],
+    ];
+
+    $seen = [0 => true];
+
+    $post_types = ['post', 'trip', 'page'];
+    $recent     = get_posts([
+        'post_type'      => $post_types,
+        'post_status'    => 'publish',
+        'numberposts'    => 12,
+        'orderby'        => 'date',
+        'order'          => 'DESC',
+        'suppress_filters' => true,
+    ]);
+
+    foreach ($recent as $item) {
+        if (!$item instanceof WP_Post) {
+            continue;
+        }
+
+        $type_object = get_post_type_object($item->post_type);
+        $type_label  = $type_object && isset($type_object->labels->singular_name)
+            ? (string) $type_object->labels->singular_name
+            : ucfirst((string) $item->post_type);
+
+        if (isset($seen[$item->ID])) {
+            continue;
+        }
+
+        $targets[] = [
+            'id'    => (int) $item->ID,
+            'label' => get_the_title($item),
+            'type'  => $type_label,
+        ];
+
+        $seen[$item->ID] = true;
+    }
+
+    wp_reset_postdata();
+
+    return $targets;
 }
