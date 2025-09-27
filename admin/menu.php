@@ -19,6 +19,7 @@ require_once HR_SA_PLUGIN_DIR . 'admin/pages/module-ai.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/pages/debug.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/ajax/ai.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/ajax/jsonld-preview.php';
+require_once HR_SA_PLUGIN_DIR . 'admin/ajax/open-graph-preview.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/ajax/modules.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/meta-boxes/ai.php';
 
@@ -121,6 +122,71 @@ function hr_sa_enqueue_admin_assets(string $hook_suffix): void
         HR_SA_VERSION,
         true
     );
+
+    if ($is_social_screen) {
+        wp_register_script(
+            'hr-sa-admin-open-graph',
+            HR_SA_PLUGIN_URL . 'assets/module-open-graph.js',
+            ['wp-i18n'],
+            HR_SA_VERSION,
+            true
+        );
+
+        $preview_targets = hr_sa_open_graph_preview_build_targets();
+        $localized_targets = array_map(
+            static function (array $item): array {
+                return [
+                    'id'    => (int) $item['id'],
+                    'label' => (string) $item['label'],
+                    'type'  => (string) $item['type'],
+                ];
+            },
+            $preview_targets['items']
+        );
+
+        $table_rows = [
+            ['key' => 'title', 'label' => __('Title', HR_SA_TEXT_DOMAIN)],
+            ['key' => 'description', 'label' => __('Description', HR_SA_TEXT_DOMAIN)],
+            ['key' => 'url', 'label' => __('URL', HR_SA_TEXT_DOMAIN)],
+            ['key' => 'image', 'label' => __('Image', HR_SA_TEXT_DOMAIN)],
+            ['key' => 'site_name', 'label' => __('Site Name', HR_SA_TEXT_DOMAIN)],
+            ['key' => 'twitter_handle', 'label' => __('Twitter Handle', HR_SA_TEXT_DOMAIN)],
+            ['key' => 'locale', 'label' => __('Locale', HR_SA_TEXT_DOMAIN)],
+        ];
+
+        $placeholder_svg = 'data:image/svg+xml;charset=UTF-8,' . rawurlencode(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630"><rect width="1200" height="630" fill="#d4d4d8"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial, sans-serif" font-size="48" fill="#4b5563">No image</text></svg>'
+        );
+
+        wp_localize_script(
+            'hr-sa-admin-open-graph',
+            'hrSaOgPreview',
+            [
+                'ajaxUrl'          => admin_url('admin-ajax.php'),
+                'nonce'            => wp_create_nonce('hr_sa_og_preview'),
+                'defaultTarget'    => 0,
+                'targets'          => $localized_targets,
+                'capped'           => (bool) $preview_targets['capped'],
+                'placeholderImage' => $placeholder_svg,
+                'table'            => $table_rows,
+                'strings'          => [
+                    'loading'         => __('Loading preview…', HR_SA_TEXT_DOMAIN),
+                    'error'           => __('We could not load the preview. Please try again.', HR_SA_TEXT_DOMAIN),
+                    'notSet'          => __('(not set)', HR_SA_TEXT_DOMAIN),
+                    'blocked'         => __('Output blocked by another SEO plugin.', HR_SA_TEXT_DOMAIN),
+                    'ogDisabled'      => __('Open Graph tags are disabled for this selection.', HR_SA_TEXT_DOMAIN),
+                    'twitterDisabled' => __('Twitter Card tags are disabled for this selection.', HR_SA_TEXT_DOMAIN),
+                    'ready'           => __('Preview loaded.', HR_SA_TEXT_DOMAIN),
+                    'cardType'        => __('Twitter Card type: %s', HR_SA_TEXT_DOMAIN),
+                    'imageAlt'        => __('Preview image', HR_SA_TEXT_DOMAIN),
+                    'optionFormat'    => __('%1$s — %2$s', HR_SA_TEXT_DOMAIN),
+                ],
+            ]
+        );
+
+        wp_set_script_translations('hr-sa-admin-open-graph', HR_SA_TEXT_DOMAIN);
+        wp_enqueue_script('hr-sa-admin-open-graph');
+    }
 
     if ($is_jsonld_screen) {
         wp_register_script(
