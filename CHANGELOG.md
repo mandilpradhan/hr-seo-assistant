@@ -7,9 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Planned
-- **0.3.0**: Template polish, description fallback order, preview card.
+- **0.4.0**: Template polish, description fallback order, preview card.
 - **1.0.0**: Stable release – OG + JSON-LD parity, diagnostics.
 - **2.0.0**: AI Assist module (OpenAI) for titles/descriptions/keywords.
+
+## [0.3.0] - 2025-10-07
+### Added
+- Module registry with independent enable/disable states and nonce-protected AJAX toggles persisted in `hrsa_modules_enabled`.
+- Dedicated submenu pages for JSON-LD, Open Graph & Twitter Cards, and AI Assist reusing the legacy settings UI.
+- HR SEO Overview dashboard cards with accessible toggles, status badges, and settings shortcuts using the HR UI token set.
+- Documentation scaffold under `docs/` describing module management and release policy.
+
+### Changed
+- Admin asset pipeline now loads module toggle script data and shared HR UI styling tokens only on HR SEO screens.
+- JSON-LD, Open Graph, AI Assist, and Debug hooks boot through the new module registry for fail-soft behaviour.
 
 ## [0.2.0] - 2025-09-24
 ### Added

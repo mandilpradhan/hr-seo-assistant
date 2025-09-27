@@ -1,5 +1,5 @@
 # HR SEO Assistant — Phase 1 Testing Checklist
-Version: 0.2.0
+Version: 0.3.0
 
 ---
 

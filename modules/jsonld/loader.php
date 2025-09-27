@@ -16,7 +16,20 @@ $GLOBALS['hr_sa_jsonld_emitters'] = [];
 /** @var array<int, string> $hr_sa_jsonld_last_active_emitters */
 $GLOBALS['hr_sa_jsonld_last_active_emitters'] = [];
 
-add_action('wp', 'hr_sa_jsonld_maybe_schedule');
+/**
+ * Register hooks for the JSON-LD module.
+ */
+function hr_sa_jsonld_boot(): void
+{
+    static $booted = false;
+
+    if ($booted) {
+        return;
+    }
+
+    add_action('wp', 'hr_sa_jsonld_maybe_schedule');
+    $booted = true;
+}
 
 /**
  * Conditionally schedule JSON-LD output.

@@ -13,9 +13,12 @@ if (!defined('ABSPATH')) {
 
 require_once HR_SA_PLUGIN_DIR . 'admin/pages/overview.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/pages/settings.php';
-require_once HR_SA_PLUGIN_DIR . 'admin/pages/modules.php';
+require_once HR_SA_PLUGIN_DIR . 'admin/pages/module-jsonld.php';
+require_once HR_SA_PLUGIN_DIR . 'admin/pages/module-open-graph.php';
+require_once HR_SA_PLUGIN_DIR . 'admin/pages/module-ai.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/pages/debug.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/ajax/ai.php';
+require_once HR_SA_PLUGIN_DIR . 'admin/ajax/modules.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/meta-boxes/ai.php';
 
 add_action('admin_menu', 'hr_sa_register_admin_menu');
@@ -51,34 +54,32 @@ function hr_sa_register_admin_menu(): void
         'hr_sa_render_overview_page'
     );
 
+    foreach (HRSA\Modules::all() as $module) {
+        if (!is_array($module) || empty($module['slug']) || empty($module['render'])) {
+            continue;
+        }
+
+        $submenu_slug = 'hr-sa-module-' . sanitize_title((string) $module['slug']);
+        $callback     = is_callable($module['render']) ? $module['render'] : '__return_null';
+
+        add_submenu_page(
+            $top_slug,
+            (string) $module['label'],
+            (string) $module['label'],
+            (string) ($module['capability'] ?? 'manage_options'),
+            $submenu_slug,
+            $callback
+        );
+    }
+
     add_submenu_page(
         $top_slug,
-        __('Settings', HR_SA_TEXT_DOMAIN),
-        __('Settings', HR_SA_TEXT_DOMAIN),
+        __('Legacy Settings', HR_SA_TEXT_DOMAIN),
+        __('Legacy Settings', HR_SA_TEXT_DOMAIN),
         'manage_options',
         'hr-sa-settings',
         'hr_sa_render_settings_page'
     );
-
-    add_submenu_page(
-        $top_slug,
-        __('Modules', HR_SA_TEXT_DOMAIN),
-        __('Modules', HR_SA_TEXT_DOMAIN),
-        'manage_options',
-        'hr-sa-modules',
-        'hr_sa_render_modules_page'
-    );
-
-    if (hr_sa_is_debug_enabled()) {
-        add_submenu_page(
-            $top_slug,
-            __('Debug', HR_SA_TEXT_DOMAIN),
-            __('Debug', HR_SA_TEXT_DOMAIN),
-            'manage_options',
-            'hr-sa-debug',
-            'hr_sa_render_debug_page'
-        );
-    }
 }
 
 /**
@@ -91,8 +92,11 @@ function hr_sa_enqueue_admin_assets(string $hook_suffix): void
     }
 
     $is_settings_screen = strpos($hook_suffix, 'hr-sa-settings') !== false;
+    $is_social_screen   = strpos($hook_suffix, 'hr-sa-module-open-graph') !== false;
+    $is_ai_screen       = strpos($hook_suffix, 'hr-sa-module-ai') !== false;
+    $needs_media        = $is_settings_screen || $is_social_screen;
 
-    if ($is_settings_screen) {
+    if ($needs_media) {
         wp_enqueue_media();
     }
 
@@ -104,7 +108,7 @@ function hr_sa_enqueue_admin_assets(string $hook_suffix): void
     );
 
     $script_dependencies = ['wp-i18n'];
-    if ($is_settings_screen) {
+    if ($needs_media) {
         $script_dependencies[] = 'media-editor';
     }
 
@@ -116,7 +120,7 @@ function hr_sa_enqueue_admin_assets(string $hook_suffix): void
         true
     );
 
-    if ($is_settings_screen) {
+    if ($is_settings_screen || $is_ai_screen) {
         $ai_settings_full = hr_sa_get_ai_settings();
         $ai_settings      = hr_sa_ai_get_settings();
 
@@ -140,6 +144,20 @@ function hr_sa_enqueue_admin_assets(string $hook_suffix): void
             ]
         );
     }
+
+    wp_localize_script(
+        'hr-sa-admin',
+        'hrSaModules',
+        [
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'nonce'   => wp_create_nonce('hrsa_toggle_module'),
+            'strings' => [
+                'toggleError' => __('Unable to update the module. Please try again.', HR_SA_TEXT_DOMAIN),
+                'enabledLabel' => __('Enabled', HR_SA_TEXT_DOMAIN),
+                'disabledLabel' => __('Disabled', HR_SA_TEXT_DOMAIN),
+            ],
+        ]
+    );
 
     wp_set_script_translations('hr-sa-admin', HR_SA_TEXT_DOMAIN);
 }
