@@ -39,6 +39,7 @@ function hr_sa_get_settings_defaults(): array
         'hr_sa_ai_model'                 => 'gpt-4o-mini',
         'hr_sa_ai_temperature'           => '0.7',
         'hr_sa_ai_max_tokens'            => '256',
+        'hr_sa_ai_global_instructions'   => '',
     ];
 }
 
@@ -194,6 +195,12 @@ function hr_sa_register_settings(): void
         'type'              => 'integer',
         'sanitize_callback' => 'hr_sa_sanitize_ai_max_tokens',
         'default'           => hr_sa_get_settings_defaults()['hr_sa_ai_max_tokens'],
+    ]);
+
+    register_setting('hr_sa_settings', 'hr_sa_ai_global_instructions', [
+        'type'              => 'string',
+        'sanitize_callback' => 'hr_sa_sanitize_ai_global_instructions',
+        'default'           => hr_sa_get_settings_defaults()['hr_sa_ai_global_instructions'],
     ]);
 
     register_setting('hr_sa_settings', 'hr_sa_conflict_mode', [
@@ -359,6 +366,20 @@ function hr_sa_sanitize_ai_max_tokens($value): string
 }
 
 /**
+ * Sanitize the global AI instruction textarea input.
+ */
+function hr_sa_sanitize_ai_global_instructions($value): string
+{
+    if (!is_string($value)) {
+        return '';
+    }
+
+    $value = sanitize_textarea_field($value);
+
+    return trim($value);
+}
+
+/**
  * Normalize the conflict mode string and mirror it into the feature flag option.
  */
 function hr_sa_sanitize_conflict_mode($value): string
@@ -401,7 +422,14 @@ function hr_sa_get_setting(string $option, $default = null)
 /**
  * Retrieve the AI-related settings with normalized types.
  *
- * @return array{hr_sa_ai_enabled: bool, hr_sa_ai_api_key: string, hr_sa_ai_model: string, hr_sa_ai_temperature: float, hr_sa_ai_max_tokens: int}
+ * @return array{
+ *     hr_sa_ai_enabled: bool,
+ *     hr_sa_ai_api_key: string,
+ *     hr_sa_ai_model: string,
+ *     hr_sa_ai_temperature: float,
+ *     hr_sa_ai_max_tokens: int,
+ *     hr_sa_ai_global_instructions: string
+ * }
  */
 function hr_sa_get_ai_settings(): array
 {
@@ -412,6 +440,7 @@ function hr_sa_get_ai_settings(): array
     $model       = get_option('hr_sa_ai_model', $defaults['hr_sa_ai_model']);
     $temperature = get_option('hr_sa_ai_temperature', $defaults['hr_sa_ai_temperature']);
     $max_tokens  = get_option('hr_sa_ai_max_tokens', $defaults['hr_sa_ai_max_tokens']);
+    $global_instructions = get_option('hr_sa_ai_global_instructions', $defaults['hr_sa_ai_global_instructions']);
 
     $settings = [
         'hr_sa_ai_enabled'     => (bool) $enabled,
@@ -419,6 +448,9 @@ function hr_sa_get_ai_settings(): array
         'hr_sa_ai_model'       => is_string($model) ? sanitize_text_field($model) : (string) $defaults['hr_sa_ai_model'],
         'hr_sa_ai_temperature' => is_numeric($temperature) ? (float) $temperature : (float) $defaults['hr_sa_ai_temperature'],
         'hr_sa_ai_max_tokens'  => is_numeric($max_tokens) ? (int) $max_tokens : (int) $defaults['hr_sa_ai_max_tokens'],
+        'hr_sa_ai_global_instructions' => is_string($global_instructions)
+            ? hr_sa_sanitize_ai_global_instructions($global_instructions)
+            : '',
     ];
 
     $settings['hr_sa_ai_temperature'] = max(0.0, min(2.0, $settings['hr_sa_ai_temperature']));
@@ -459,6 +491,7 @@ function hr_sa_get_all_settings(): array
     $settings['hr_sa_ai_temperature'] = $ai_settings['hr_sa_ai_temperature'];
     $settings['hr_sa_ai_max_tokens'] = $ai_settings['hr_sa_ai_max_tokens'];
     $settings['hr_sa_ai_api_key'] = hr_sa_mask_api_key_for_display($ai_settings['hr_sa_ai_api_key']);
+    $settings['hr_sa_ai_global_instructions'] = $ai_settings['hr_sa_ai_global_instructions'];
 
     return $settings;
 }

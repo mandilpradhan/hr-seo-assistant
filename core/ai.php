@@ -32,7 +32,15 @@ function hr_sa_ai_is_enabled(): bool
 /**
  * Retrieve AI settings, optionally including the raw API key.
  *
- * @return array{hr_sa_ai_enabled: bool, hr_sa_ai_api_key: string, hr_sa_ai_model: string, hr_sa_ai_temperature: float, hr_sa_ai_max_tokens: int, hr_sa_ai_has_key: bool}
+ * @return array{
+ *     hr_sa_ai_enabled: bool,
+ *     hr_sa_ai_api_key: string,
+ *     hr_sa_ai_model: string,
+ *     hr_sa_ai_temperature: float,
+ *     hr_sa_ai_max_tokens: int,
+ *     hr_sa_ai_global_instructions: string,
+ *     hr_sa_ai_has_key: bool
+ * }
  */
 function hr_sa_ai_get_settings(bool $with_key = false): array
 {
@@ -452,15 +460,20 @@ function hr_sa_ai_prepare_trip_seasonality(int $post_id): string
  * Build chat completion messages for a given generation request.
  *
  * @param array<string, mixed> $context
+ * @param array<string, mixed>|null $settings Optional AI settings array.
  *
  * @return array<int, array<string, string>>
  */
-function hr_sa_ai_build_messages(string $type, array $context): array
+function hr_sa_ai_build_messages(string $type, array $context, ?array $settings = null): array
 {
     $title_limit       = hr_sa_ai_get_title_limit();
     $description_limit = hr_sa_ai_get_description_limit();
 
     $system_message = 'You are a senior SEO copy assistant for a Himalayan adventure travel website. Return clean plain text with no quotes, HTML, or Markdown.';
+
+    if ($settings === null) {
+        $settings = hr_sa_get_ai_settings();
+    }
 
     switch ($type) {
         case 'title':
@@ -489,14 +502,41 @@ function hr_sa_ai_build_messages(string $type, array $context): array
             'role'    => 'system',
             'content' => $system_message,
         ],
-        [
-            'role'    => 'system',
-            'content' => $policy_message,
-        ],
-        [
-            'role'    => 'user',
-            'content' => $user_message,
-        ],
+    ];
+
+    $instructions = '';
+    if (isset($settings['hr_sa_ai_global_instructions'])) {
+        $instructions = is_string($settings['hr_sa_ai_global_instructions'])
+            ? trim($settings['hr_sa_ai_global_instructions'])
+            : '';
+    }
+
+    if ($instructions === '') {
+        $raw_instructions = get_option('hr_sa_ai_global_instructions', '');
+        if (is_string($raw_instructions) && $raw_instructions !== '') {
+            $instructions = hr_sa_sanitize_ai_global_instructions($raw_instructions);
+        }
+    }
+
+    if ($instructions !== '') {
+        $instructions = hr_sa_sanitize_ai_global_instructions($instructions);
+
+        if ($instructions !== '') {
+            $messages[] = [
+                'role'    => 'system',
+                'content' => $instructions,
+            ];
+        }
+    }
+
+    $messages[] = [
+        'role'    => 'system',
+        'content' => $policy_message,
+    ];
+
+    $messages[] = [
+        'role'    => 'user',
+        'content' => $user_message,
     ];
 
     $filter_name = 'hr_sa_ai_prompt_' . $type;
@@ -743,7 +783,7 @@ function hr_sa_ai_generate(string $type, array $context, array $settings)
         $max_tokens_setting = 512;
     }
 
-    $messages = hr_sa_ai_build_messages($type, $context);
+    $messages = hr_sa_ai_build_messages($type, $context, $settings);
     if (!$messages) {
         return new WP_Error('hr_sa_ai_invalid_prompt', __('We could not prepare enough context for AI generation.', HR_SA_TEXT_DOMAIN));
     }

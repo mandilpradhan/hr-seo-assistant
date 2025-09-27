@@ -38,11 +38,12 @@ function hr_sa_get_settings_view_model(): array
     $image_suffix_replace  = (string) hr_sa_get_setting('hr_sa_image_url_suffix_replace');
     $conflict_mode = hr_sa_get_conflict_mode();
     $debug_enabled = hr_sa_is_debug_enabled();
-    $ai_settings   = hr_sa_get_ai_settings(true);
+    $ai_settings   = hr_sa_get_ai_settings();
     $ai_enabled    = (bool) $ai_settings['hr_sa_ai_enabled'];
     $ai_model      = (string) $ai_settings['hr_sa_ai_model'];
     $ai_temperature = (float) $ai_settings['hr_sa_ai_temperature'];
     $ai_max_tokens = (int) $ai_settings['hr_sa_ai_max_tokens'];
+    $ai_global_instructions = (string) $ai_settings['hr_sa_ai_global_instructions'];
     $ai_key_masked = hr_sa_mask_api_key_for_display($ai_settings['hr_sa_ai_api_key']);
     $ai_has_key    = $ai_settings['hr_sa_ai_api_key'] !== '';
 
@@ -68,6 +69,7 @@ function hr_sa_get_settings_view_model(): array
         'ai_model'               => $ai_model,
         'ai_temperature'         => $ai_temperature,
         'ai_max_tokens'          => $ai_max_tokens,
+        'ai_global_instructions' => $ai_global_instructions,
         'ai_key_masked'          => $ai_key_masked,
         'ai_has_key'             => $ai_has_key,
     ];
@@ -107,6 +109,7 @@ function hr_sa_render_settings_page(): void
     $ai_model      = (string) $ai_settings['hr_sa_ai_model'];
     $ai_temperature = (float) $ai_settings['hr_sa_ai_temperature'];
     $ai_max_tokens = (int) $ai_settings['hr_sa_ai_max_tokens'];
+    $ai_global_instructions = (string) $ai_settings['hr_sa_ai_global_instructions'];
     $ai_key_masked = hr_sa_mask_api_key_for_display($ai_settings['hr_sa_ai_api_key']);
     $ai_has_key    = $ai_settings['hr_sa_ai_api_key'] !== '';
 
@@ -176,16 +179,24 @@ function hr_sa_render_settings_page(): void
                                         <input type="password" id="hr_sa_ai_api_key" name="hr_sa_ai_api_key" value="<?php echo esc_attr($ai_has_key ? $ai_key_masked : ''); ?>" class="regular-text" autocomplete="off" />
                                     </div>
                                     <div class="hr-sa-ai-settings__field">
+                                        <label for="hr_sa_ai_global_instructions"><?php esc_html_e('Global AI Instructions', HR_SA_TEXT_DOMAIN); ?></label>
+                                        <textarea id="hr_sa_ai_global_instructions" name="hr_sa_ai_global_instructions" rows="5" class="large-text code"><?php echo esc_textarea($ai_global_instructions); ?></textarea>
+                                        <p class="description"><?php esc_html_e('Optional guidance sent with every AI request. Use this to enforce tone, disclaimers, or topics to avoid.', HR_SA_TEXT_DOMAIN); ?></p>
+                                    </div>
+                                    <div class="hr-sa-ai-settings__field">
                                         <label for="hr_sa_ai_model"><?php esc_html_e('Model', HR_SA_TEXT_DOMAIN); ?></label>
                                         <input type="text" id="hr_sa_ai_model" name="hr_sa_ai_model" value="<?php echo esc_attr($ai_model); ?>" class="regular-text" />
+                                        <p class="description"><?php esc_html_e('Provider-specific identifier (e.g., gpt-4o-mini). Choose a model that supports chat completions.', HR_SA_TEXT_DOMAIN); ?></p>
                                     </div>
                                     <div class="hr-sa-ai-settings__field">
                                         <label for="hr_sa_ai_temperature"><?php esc_html_e('Temperature', HR_SA_TEXT_DOMAIN); ?></label>
                                         <input type="number" id="hr_sa_ai_temperature" name="hr_sa_ai_temperature" value="<?php echo esc_attr(number_format($ai_temperature, 2, '.', '')); ?>" step="0.1" min="0" max="2" />
+                                        <p class="description"><?php esc_html_e('Controls creativity. Lower values are conservative; higher values allow more varied suggestions.', HR_SA_TEXT_DOMAIN); ?></p>
                                     </div>
                                     <div class="hr-sa-ai-settings__field">
                                         <label for="hr_sa_ai_max_tokens"><?php esc_html_e('Max Tokens', HR_SA_TEXT_DOMAIN); ?></label>
                                         <input type="number" id="hr_sa_ai_max_tokens" name="hr_sa_ai_max_tokens" value="<?php echo esc_attr((string) $ai_max_tokens); ?>" min="1" max="4096" />
+                                        <p class="description"><?php esc_html_e('Upper limit for each response. Lower values keep answers brief and reduce costs.', HR_SA_TEXT_DOMAIN); ?></p>
                                     </div>
                                 </div>
                                 <button type="button" class="button hr-sa-ai-test"><?php esc_html_e('Test Connection', HR_SA_TEXT_DOMAIN); ?></button>
