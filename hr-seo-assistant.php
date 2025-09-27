@@ -36,6 +36,7 @@ require_once HR_SA_PLUGIN_DIR . 'admin/pages/module-open-graph.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/pages/module-ai.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/meta-boxes/ai.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/ajax/ai.php';
+require_once HR_SA_PLUGIN_DIR . 'admin/ajax/jsonld-preview.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/ajax/modules.php';
 require_once HR_SA_PLUGIN_DIR . 'admin/menu.php';
 require_once HR_SA_PLUGIN_DIR . 'modules/meta/seo.php';
