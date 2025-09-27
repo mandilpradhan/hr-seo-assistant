@@ -104,13 +104,23 @@
 
         const tbody = document.createElement('tbody');
 
+        const fallbackTypeLabel = getMessage('tableType', __('Type', 'hr-seo-assistant'));
+        const fallbackPropertyLabel = getMessage(
+            'tableProperty',
+            getMessage('tableKey', __('Property', 'hr-seo-assistant'))
+        );
+
         rows.forEach((row) => {
             if (!row || typeof row !== 'object') {
                 return;
             }
 
-            const type = typeof row.type === 'string' ? row.type : '';
-            const property = typeof row.property === 'string' ? row.property : '';
+            const type = typeof row.type === 'string' && row.type.trim() !== ''
+                ? row.type
+                : fallbackTypeLabel;
+            const property = typeof row.property === 'string' && row.property.trim() !== ''
+                ? row.property
+                : fallbackPropertyLabel;
             const value = typeof row.value === 'string' ? row.value : '';
 
             const tr = document.createElement('tr');
