@@ -177,7 +177,6 @@ function hr_sa_enqueue_admin_assets(string $hook_suffix): void
                     'ogDisabled'      => __('Open Graph tags are disabled for this selection.', HR_SA_TEXT_DOMAIN),
                     'twitterDisabled' => __('Twitter Card tags are disabled for this selection.', HR_SA_TEXT_DOMAIN),
                     'ready'           => __('Preview loaded.', HR_SA_TEXT_DOMAIN),
-                    'cardType'        => __('Twitter Card type: %s', HR_SA_TEXT_DOMAIN),
                     'imageAlt'        => __('Preview image', HR_SA_TEXT_DOMAIN),
                     'optionFormat'    => __('%1$s — %2$s', HR_SA_TEXT_DOMAIN),
                 ],
