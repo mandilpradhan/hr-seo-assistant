@@ -11,10 +11,24 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-add_action('init', 'hr_sa_register_ai_meta_fields');
-add_action('add_meta_boxes', 'hr_sa_register_ai_meta_box');
-add_action('save_post', 'hr_sa_save_ai_meta_box', 10, 2);
-add_action('admin_enqueue_scripts', 'hr_sa_enqueue_ai_meta_box_assets');
+/**
+ * Bootstraps the AI module hooks.
+ */
+function hr_sa_ai_boot_module(): void
+{
+    static $booted = false;
+
+    if ($booted) {
+        return;
+    }
+
+    add_action('init', 'hr_sa_register_ai_meta_fields');
+    add_action('add_meta_boxes', 'hr_sa_register_ai_meta_box');
+    add_action('save_post', 'hr_sa_save_ai_meta_box', 10, 2);
+    add_action('admin_enqueue_scripts', 'hr_sa_enqueue_ai_meta_box_assets');
+
+    $booted = true;
+}
 
 /**
  * Return the list of post types that support the AI meta box.

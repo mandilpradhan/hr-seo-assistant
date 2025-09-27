@@ -20,43 +20,53 @@ function hr_sa_render_overview_page(): void
         wp_die(esc_html__('You do not have permission to access this page.', HR_SA_TEXT_DOMAIN));
     }
 
+    $modules    = HRSA\Modules::all();
+    $legacy_url = admin_url('admin.php?page=hr-sa-settings');
     $version    = HR_SA_VERSION;
-    $settings   = admin_url('admin.php?page=hr-sa-settings');
-    $modules    = admin_url('admin.php?page=hr-sa-modules');
-    $debug_link = admin_url('admin.php?page=hr-sa-debug');
-    $debug_on   = hr_sa_is_debug_enabled();
     ?>
-    <div class="wrap hr-sa-wrap">
-        <h1><?php echo esc_html__('HR SEO Assistant', HR_SA_TEXT_DOMAIN); ?></h1>
-        <p class="hr-sa-intro">
-            <?php esc_html_e('Centralized controls for Himalayan Rides SEO metadata, structured data, and diagnostics.', HR_SA_TEXT_DOMAIN); ?>
-        </p>
-        <div class="hr-sa-card-grid">
-            <div class="hr-sa-card">
-                <h2><?php esc_html_e('Plugin Status', HR_SA_TEXT_DOMAIN); ?></h2>
-                <p><?php echo esc_html(sprintf(__('Version %s', HR_SA_TEXT_DOMAIN), $version)); ?></p>
-                <ul>
-                    <li><?php echo esc_html__('JSON-LD Emitters', HR_SA_TEXT_DOMAIN) . ': ' . (hr_sa_is_jsonld_enabled() ? esc_html__('Enabled', HR_SA_TEXT_DOMAIN) : esc_html__('Disabled', HR_SA_TEXT_DOMAIN)); ?></li>
-                    <li><?php echo esc_html__('Open Graph Tags', HR_SA_TEXT_DOMAIN) . ': ' . (hr_sa_is_og_enabled() ? esc_html__('Enabled', HR_SA_TEXT_DOMAIN) : esc_html__('Disabled', HR_SA_TEXT_DOMAIN)); ?></li>
-                    <li><?php echo esc_html__('Twitter Cards', HR_SA_TEXT_DOMAIN) . ': ' . (hr_sa_is_twitter_enabled() ? esc_html__('Enabled', HR_SA_TEXT_DOMAIN) : esc_html__('Disabled', HR_SA_TEXT_DOMAIN)); ?></li>
-                    <li><?php echo esc_html__('Debug Mode', HR_SA_TEXT_DOMAIN) . ': ' . ($debug_on ? esc_html__('Enabled', HR_SA_TEXT_DOMAIN) : esc_html__('Disabled', HR_SA_TEXT_DOMAIN)); ?></li>
-                </ul>
-            </div>
-            <div class="hr-sa-card">
-                <h2><?php esc_html_e('Quick Links', HR_SA_TEXT_DOMAIN); ?></h2>
-                <ul>
-                    <li><a href="<?php echo esc_url($settings); ?>"><?php esc_html_e('Settings', HR_SA_TEXT_DOMAIN); ?></a></li>
-                    <li><a href="<?php echo esc_url($modules); ?>"><?php esc_html_e('Modules', HR_SA_TEXT_DOMAIN); ?></a></li>
-                    <li>
-                        <?php if ($debug_on) : ?>
-                            <a href="<?php echo esc_url($debug_link); ?>"><?php esc_html_e('Debug Tools', HR_SA_TEXT_DOMAIN); ?></a>
-                        <?php else : ?>
-                            <span class="description"><?php esc_html_e('Enable Debug Mode in settings to access Debug Tools.', HR_SA_TEXT_DOMAIN); ?></span>
-                        <?php endif; ?>
-                    </li>
-                </ul>
-            </div>
+    <div class="wrap hrui-wrap">
+        <h1><?php esc_html_e('HR SEO Assistant', HR_SA_TEXT_DOMAIN); ?></h1>
+        <p class="description"><?php esc_html_e('Toggle modules and review their status. Legacy settings remain available for reference.', HR_SA_TEXT_DOMAIN); ?></p>
+        <p><strong><?php echo esc_html(sprintf(__('Version %s', HR_SA_TEXT_DOMAIN), $version)); ?></strong></p>
+        <div class="hrui-grid">
+            <?php foreach ($modules as $module) :
+                if (!is_array($module)) {
+                    continue;
+                }
+
+                $slug        = (string) ($module['slug'] ?? '');
+                $label       = (string) ($module['label'] ?? $slug);
+                $description = (string) ($module['description'] ?? '');
+                $enabled     = HRSA\Modules::is_enabled($slug);
+                $badge_class = $enabled ? 'hrui-badge enabled' : 'hrui-badge disabled';
+                $badge_text  = $enabled ? __('Enabled', HR_SA_TEXT_DOMAIN) : __('Disabled', HR_SA_TEXT_DOMAIN);
+                $submenu     = 'hr-sa-module-' . sanitize_title($slug);
+                $settings_url = admin_url('admin.php?page=' . $submenu);
+                ?>
+                <div class="hrui-card" data-module-card="<?php echo esc_attr($slug); ?>">
+                    <div class="meta">
+                        <h3><?php echo esc_html($label); ?></h3>
+                        <p><?php echo esc_html($description); ?></p>
+                        <div class="hrui-badges">
+                            <span class="<?php echo esc_attr($badge_class); ?>" data-status-badge>
+                                <span class="screen-reader-text"><?php esc_html_e('Status:', HR_SA_TEXT_DOMAIN); ?></span>
+                                <?php echo esc_html($badge_text); ?>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="hrui-actions">
+                        <label class="hrui-toggle">
+                            <span class="screen-reader-text"><?php echo esc_html(sprintf(__('Toggle %s module', HR_SA_TEXT_DOMAIN), $label)); ?></span>
+                            <input type="checkbox" data-module-toggle data-slug="<?php echo esc_attr($slug); ?>" <?php checked($enabled); ?> />
+                        </label>
+                        <a class="hrui-settings-link" href="<?php echo esc_url($settings_url); ?>"><?php esc_html_e('Settings', HR_SA_TEXT_DOMAIN); ?></a>
+                    </div>
+                </div>
+            <?php endforeach; ?>
         </div>
+        <p class="description">
+            <a href="<?php echo esc_url($legacy_url); ?>"><?php esc_html_e('Open Legacy Settings', HR_SA_TEXT_DOMAIN); ?></a>
+        </p>
     </div>
     <?php
 }

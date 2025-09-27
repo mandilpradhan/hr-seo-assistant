@@ -12,6 +12,68 @@ if (!defined('ABSPATH')) {
 }
 
 /**
+ * Provide a reusable view model of settings values for module pages.
+ *
+ * @return array<string, mixed>
+ */
+function hr_sa_get_settings_view_model(): array
+{
+    $fallback      = (string) hr_sa_get_setting('hr_sa_fallback_image', '');
+    $og_enabled    = hr_sa_is_flag_enabled('hr_sa_og_enabled', false);
+    $twitter_cards = hr_sa_is_flag_enabled('hr_sa_twitter_enabled', false);
+    $tpl_trip      = (string) hr_sa_get_setting('hr_sa_tpl_trip');
+    $tpl_page      = (string) hr_sa_get_setting('hr_sa_tpl_page');
+    $brand_suffix  = (bool) hr_sa_get_setting('hr_sa_tpl_page_brand_suffix');
+    $locale        = (string) hr_sa_get_setting('hr_sa_locale');
+    $locale_choices = hr_sa_get_locale_choices();
+    if ($locale !== '' && !array_key_exists($locale, $locale_choices)) {
+        $locale_choices = [$locale => sprintf(__('Current (custom): %s', HR_SA_TEXT_DOMAIN), $locale)] + $locale_choices;
+    }
+    $site_name     = (string) hr_sa_get_setting('hr_sa_site_name', get_bloginfo('name'));
+    $twitter       = (string) hr_sa_get_setting('hr_sa_twitter_handle');
+    $image_replace_enabled = (bool) hr_sa_get_setting('hr_sa_image_url_replace_enabled');
+    $image_prefix_find     = (string) hr_sa_get_setting('hr_sa_image_url_prefix_find');
+    $image_prefix_replace  = (string) hr_sa_get_setting('hr_sa_image_url_prefix_replace');
+    $image_suffix_find     = (string) hr_sa_get_setting('hr_sa_image_url_suffix_find');
+    $image_suffix_replace  = (string) hr_sa_get_setting('hr_sa_image_url_suffix_replace');
+    $conflict_mode = hr_sa_get_conflict_mode();
+    $debug_enabled = hr_sa_is_debug_enabled();
+    $ai_settings   = hr_sa_get_ai_settings(true);
+    $ai_enabled    = (bool) $ai_settings['hr_sa_ai_enabled'];
+    $ai_model      = (string) $ai_settings['hr_sa_ai_model'];
+    $ai_temperature = (float) $ai_settings['hr_sa_ai_temperature'];
+    $ai_max_tokens = (int) $ai_settings['hr_sa_ai_max_tokens'];
+    $ai_key_masked = hr_sa_mask_api_key_for_display($ai_settings['hr_sa_ai_api_key']);
+    $ai_has_key    = $ai_settings['hr_sa_ai_api_key'] !== '';
+
+    return [
+        'fallback'               => $fallback,
+        'og_enabled'             => $og_enabled,
+        'twitter_cards'          => $twitter_cards,
+        'tpl_trip'               => $tpl_trip,
+        'tpl_page'               => $tpl_page,
+        'brand_suffix'           => $brand_suffix,
+        'locale'                 => $locale,
+        'locale_choices'         => $locale_choices,
+        'site_name'              => $site_name,
+        'twitter'                => $twitter,
+        'image_replace_enabled'  => $image_replace_enabled,
+        'image_prefix_find'      => $image_prefix_find,
+        'image_prefix_replace'   => $image_prefix_replace,
+        'image_suffix_find'      => $image_suffix_find,
+        'image_suffix_replace'   => $image_suffix_replace,
+        'conflict_mode'          => $conflict_mode,
+        'debug_enabled'          => $debug_enabled,
+        'ai_enabled'             => $ai_enabled,
+        'ai_model'               => $ai_model,
+        'ai_temperature'         => $ai_temperature,
+        'ai_max_tokens'          => $ai_max_tokens,
+        'ai_key_masked'          => $ai_key_masked,
+        'ai_has_key'             => $ai_has_key,
+    ];
+}
+
+/**
  * Render the settings page.
  */
 function hr_sa_render_settings_page(): void

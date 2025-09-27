@@ -19,10 +19,24 @@ $GLOBALS['hr_sa_last_social_snapshot'] = null;
  */
 function hr_sa_bootstrap_og_module(): void
 {
+    hr_sa_og_boot_module();
+}
+
+/**
+ * Register the OG/Twitter hooks once.
+ */
+function hr_sa_og_boot_module(): void
+{
+    static $booted = false;
+
+    if ($booted) {
+        return;
+    }
+
     hr_sa_maybe_register_external_og_scrub();
     add_action('wp', 'hr_sa_social_meta_maybe_schedule');
+    $booted = true;
 }
-add_action('init', 'hr_sa_bootstrap_og_module');
 
 /**
  * Register the WP Travel Engine OG scrubber when requested.

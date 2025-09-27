@@ -182,6 +182,98 @@
         copyWithClipboard(textToCopy, onSuccess, onFailure);
     };
 
+    const bindModuleToggles = () => {
+        const moduleConfig = window.hrSaModules;
+        if (!moduleConfig || !moduleConfig.ajaxUrl || !moduleConfig.nonce || !moduleConfig.strings) {
+            return;
+        }
+
+        const toggles = document.querySelectorAll('[data-module-toggle]');
+        if (!toggles || toggles.length === 0) {
+            return;
+        }
+
+        const updateCard = (checkbox, enabled) => {
+            const card = checkbox.closest('[data-module-card]');
+            if (!card) {
+                return;
+            }
+
+            const badge = card.querySelector('[data-status-badge]');
+            if (!badge) {
+                return;
+            }
+
+            badge.classList.toggle('enabled', enabled);
+            badge.classList.toggle('disabled', !enabled);
+            badge.textContent = enabled ? moduleConfig.strings.enabledLabel : moduleConfig.strings.disabledLabel;
+        };
+
+        const revertToggle = (checkbox, previousState) => {
+            checkbox.checked = previousState;
+            updateCard(checkbox, previousState);
+        };
+
+        const handleToggleChange = (event) => {
+            const checkbox = event.currentTarget;
+            if (!checkbox) {
+                return;
+            }
+
+            const slug = checkbox.getAttribute('data-slug');
+            if (!slug) {
+                return;
+            }
+
+            const previousState = !checkbox.checked;
+            checkbox.disabled = true;
+
+            const payload = new window.URLSearchParams();
+            payload.append('action', 'hrsa_toggle_module');
+            payload.append('module', slug);
+            payload.append('enabled', checkbox.checked ? '1' : '0');
+            payload.append('_wpnonce', moduleConfig.nonce);
+
+            window.fetch(moduleConfig.ajaxUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                },
+                body: payload.toString(),
+            })
+                .then((response) => response.json())
+                .then((payload) => {
+                    const result = payload && typeof payload === 'object' ? payload : {};
+                    const data = result.data && typeof result.data === 'object' ? result.data : {};
+
+                    if (!result.success || data.ok !== true) {
+                        const errorMessage = data && typeof data.message === 'string'
+                            ? data.message
+                            : moduleConfig.strings.toggleError;
+                        window.alert(errorMessage);
+                        revertToggle(checkbox, previousState);
+                        return;
+                    }
+
+                    const nextState = Boolean(data.enabled);
+                    updateCard(checkbox, nextState);
+                })
+                .catch(() => {
+                    window.alert(moduleConfig.strings.toggleError);
+                    revertToggle(checkbox, previousState);
+                })
+                .finally(() => {
+                    checkbox.disabled = false;
+                });
+        };
+
+        toggles.forEach((toggle) => {
+            updateCard(toggle, toggle.checked);
+            toggle.addEventListener('change', handleToggleChange);
+        });
+    };
+
     const openMediaFrame = (targetId) => {
         if (!wpGlobal.media || typeof wpGlobal.media !== 'function') {
             window.alert(__('The media library is unavailable. Please reload the page and try again.', 'hr-seo-assistant'));
@@ -412,6 +504,7 @@
         bindCopyButtons();
         bindFallbackNormalization();
         bindAiTestButton();
+        bindModuleToggles();
     };
 
     if (document.readyState === 'loading') {
