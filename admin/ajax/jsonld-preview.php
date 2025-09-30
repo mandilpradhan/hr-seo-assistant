@@ -45,20 +45,11 @@ function hr_sa_handle_jsonld_preview(): void
 
     $restore = $context['restore'];
 
-    $original_emitters = $GLOBALS['hr_sa_jsonld_last_active_emitters'] ?? [];
-    $rows              = [];
-    $json              = '';
+    $rows = [];
+    $json = '';
 
     try {
-        $graph = hr_sa_jsonld_collect_graph();
-        $graph = hr_sa_jsonld_normalize_internal_urls($graph);
-        $graph = hr_sa_jsonld_enforce_org_and_brand($graph);
-        $graph = hr_sa_jsonld_dedupe_by_id($graph);
-
-        $graph = apply_filters('hr_sa_jsonld_graph_nodes', $graph);
-        $graph = hr_sa_jsonld_normalize_internal_urls($graph);
-        $graph = hr_sa_jsonld_enforce_org_and_brand($graph);
-        $graph = hr_sa_jsonld_dedupe_by_id($graph);
+        $graph = hr_sa_jsonld_build_graph(hr_sa_get_context());
 
         $payload = [
             '@context' => 'https://schema.org',
@@ -71,10 +62,10 @@ function hr_sa_handle_jsonld_preview(): void
             $json = '{}';
         }
     } finally {
-        $GLOBALS['hr_sa_jsonld_last_active_emitters'] = $original_emitters;
         if (is_callable($restore)) {
             $restore();
         }
+        wp_reset_postdata();
     }
 
     wp_send_json_success(

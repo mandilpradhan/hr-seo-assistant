@@ -125,7 +125,7 @@ function hr_sa_social_meta_maybe_schedule(): void
         return;
     }
 
-    add_action('wp_head', 'hr_sa_output_social_meta', 15);
+    add_action('wp_head', 'hr_sa_output_social_meta', 6);
 }
 
 /**
@@ -205,13 +205,14 @@ function hr_sa_collect_social_tag_data(): array
     $twitter_tags = $twitter_enabled ? hr_sa_prepare_twitter_tags($context) : [];
 
     $fields = [
-        'title'          => (string) ($context['title'] ?? ''),
-        'description'    => (string) ($context['description'] ?? ''),
-        'url'            => (string) ($context['url'] ?? ''),
-        'image'          => (string) ($context['image'] ?? ($context['hero_url'] ?? '')),
-        'site_name'      => (string) ($context['site_name'] ?? ''),
-        'locale'         => (string) ($context['locale'] ?? ''),
-        'twitter_handle' => (string) ($context['twitter_handle'] ?? ''),
+        'title'          => (string) ($context['meta']['title'] ?? ''),
+        'description'    => (string) ($context['meta']['description'] ?? ''),
+        'url'            => (string) ($context['meta']['canonical_url'] ?? ''),
+        'image'          => (string) ($context['hero']['image_url'] ?? ''),
+        'site_name'      => (string) ($context['site']['name'] ?? ''),
+        'locale'         => '',
+        'twitter_handle' => '',
+        'og_type'        => (string) ($context['meta']['og_type'] ?? ''),
     ];
 
     $snapshot = [
@@ -241,49 +242,46 @@ function hr_sa_collect_social_tag_data(): array
  */
 function hr_sa_prepare_og_tags(array $context): array
 {
-    $title       = trim((string) ($context['title'] ?? ''));
-    $description = trim((string) ($context['description'] ?? ''));
-    $url         = trim((string) ($context['url'] ?? ''));
-    $image       = trim((string) ($context['image'] ?? ($context['hero_url'] ?? '')));
-    $site_name   = trim((string) ($context['site_name'] ?? ''));
-    $locale      = trim((string) ($context['locale'] ?? ''));
-    $type        = hr_sa_map_og_type((string) ($context['type'] ?? ''));
+    $meta = $context['meta'] ?? [];
+    $site = $context['site'] ?? [];
+    $hero = $context['hero'] ?? [];
 
-    if ($locale === '') {
-        $locale = get_locale();
+    $title       = hr_sa_hrdf_string($meta['title'] ?? '');
+    $description = hr_sa_hrdf_string($meta['description'] ?? '');
+    $url         = hr_sa_hrdf_url($meta['canonical_url'] ?? '');
+    $image       = hr_sa_hrdf_url($hero['image_url'] ?? '');
+    $site_name   = hr_sa_hrdf_string($site['name'] ?? '');
+
+    $type = hr_sa_hrdf_string($meta['og_type'] ?? '');
+    if ($type === '') {
+        $type = hr_sa_context_has_trip($context) ? 'product' : 'website';
     }
 
-    $tags = [
-        'og:title'       => $title,
-        'og:description' => $description,
-        'og:type'        => $type,
-        'og:url'         => $url,
-        'og:image'       => $image,
-        'og:site_name'   => $site_name,
-        'og:locale'      => $locale,
-    ];
-
-    $tags = array_filter($tags, static fn($value): bool => is_string($value) && $value !== '');
-    $ordered_keys = ['og:title', 'og:description', 'og:type', 'og:url', 'og:image', 'og:site_name', 'og:locale'];
-    $ordered = [];
-    foreach ($ordered_keys as $key) {
-        if (isset($tags[$key])) {
-            $ordered[$key] = $tags[$key];
-        }
+    $tags = [];
+    if ($title !== '') {
+        $tags['og:title'] = $title;
     }
-    foreach ($tags as $key => $value) {
-        if (!isset($ordered[$key])) {
-            $ordered[$key] = $value;
-        }
+    if ($description !== '') {
+        $tags['og:description'] = $description;
+    }
+    $tags['og:type'] = $type;
+    if ($url !== '') {
+        $tags['og:url'] = $url;
+    }
+    if ($image !== '') {
+        $tags['og:image'] = $image;
+    }
+    if ($site_name !== '') {
+        $tags['og:site_name'] = $site_name;
     }
 
     /**
      * Filter the final Open Graph tag set prior to emission.
      *
-     * @param array<string, string> $ordered
+     * @param array<string, string> $tags
      * @param array<string, mixed>  $context
      */
-    return apply_filters('hr_sa_og_tags', $ordered, $context);
+    return apply_filters('hr_sa_og_tags', $tags, $context);
 }
 
 /**
@@ -295,64 +293,44 @@ function hr_sa_prepare_og_tags(array $context): array
  */
 function hr_sa_prepare_twitter_tags(array $context): array
 {
-    $title       = trim((string) ($context['title'] ?? ''));
-    $description = trim((string) ($context['description'] ?? ''));
-    $image       = trim((string) ($context['image'] ?? ($context['hero_url'] ?? '')));
-    $handle      = trim((string) ($context['twitter_handle'] ?? ''));
+    $meta = $context['meta'] ?? [];
+    $hero = $context['hero'] ?? [];
+
+    $title       = hr_sa_hrdf_string($meta['title'] ?? '');
+    $description = hr_sa_hrdf_string($meta['description'] ?? '');
+    $image       = hr_sa_hrdf_url($hero['image_url'] ?? '');
+
+    $card = $image !== '' ? 'summary_large_image' : 'summary';
 
     $tags = [
-        'twitter:card'        => 'summary_large_image',
-        'twitter:title'       => $title,
-        'twitter:description' => $description,
-        'twitter:image'       => $image,
+        'twitter:card' => $card,
     ];
 
-    if ($handle !== '') {
-        $tags['twitter:site'] = $handle;
+    if ($title !== '') {
+        $tags['twitter:title'] = $title;
     }
 
-    $tags = array_filter($tags, static fn($value): bool => is_string($value) && $value !== '');
-    $ordered_keys = ['twitter:card', 'twitter:title', 'twitter:description', 'twitter:image', 'twitter:site'];
-    $ordered = [];
-    foreach ($ordered_keys as $key) {
-        if (isset($tags[$key])) {
-            $ordered[$key] = $tags[$key];
-        }
+    if ($description !== '') {
+        $tags['twitter:description'] = $description;
     }
-    foreach ($tags as $key => $value) {
-        if (!isset($ordered[$key])) {
-            $ordered[$key] = $value;
-        }
+
+    if ($image !== '') {
+        $tags['twitter:image'] = $image;
     }
 
     /**
      * Filter the final Twitter Card tag set prior to emission.
      *
-     * @param array<string, string> $ordered
+     * @param array<string, string> $tags
      * @param array<string, mixed>  $context
      */
-    $ordered = apply_filters('hr_sa_twitter_tags', $ordered, $context);
+    $tags = apply_filters('hr_sa_twitter_tags', $tags, $context);
 
-    if (!isset($ordered['twitter:card'])) {
-        $ordered = ['twitter:card' => 'summary_large_image'] + $ordered;
+    if (!isset($tags['twitter:card'])) {
+        $tags = ['twitter:card' => $card] + $tags;
     }
 
-    return $ordered;
-}
-
-/**
- * Map internal content types to Open Graph types.
- */
-function hr_sa_map_og_type(string $content_type): string
-{
-    switch ($content_type) {
-        case 'home':
-            return 'website';
-        case 'trip':
-            return 'product';
-        default:
-            return 'article';
-    }
+    return $tags;
 }
 
 /**

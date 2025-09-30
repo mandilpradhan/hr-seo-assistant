@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Planned
-- **0.4.0**: Template polish, description fallback order, preview card.
+- Future enhancements TBD.
+
+## [0.4.0] - 2025-09-30
+### Added
+- Added a resolved HRDF inspector on the debug screen for quick verification.
+
+### Changed
+- Replaced all JSON-LD output with HRDF-sourced nodes and removed legacy emitters.
+- Updated Open Graph, Twitter Card, and canonical emitters to rely solely on HRDF data.
+
+### Removed
+- Removed internal fallback generators and schema helpers that duplicated HRDF content.
 - **1.0.0**: Stable release – OG + JSON-LD parity, diagnostics.
 - **2.0.0**: AI Assist module (OpenAI) for titles/descriptions/keywords.
 

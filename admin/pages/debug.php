@@ -77,7 +77,16 @@ function hr_sa_render_debug_page(): void
         'site_name'      => __('Site Name', HR_SA_TEXT_DOMAIN),
         'locale'         => __('Locale', HR_SA_TEXT_DOMAIN),
         'twitter_handle' => __('Twitter Handle', HR_SA_TEXT_DOMAIN),
+        'og_type'        => __('Open Graph Type', HR_SA_TEXT_DOMAIN),
     ];
+
+    $hrdf_global_doc = hr_sa_get_hrdf_document();
+    $hrdf_global     = is_array($hrdf_global_doc['hrdf'] ?? null) ? $hrdf_global_doc['hrdf'] : [];
+    $hrdf_post       = [];
+    if ($post_id) {
+        $post_doc  = hr_sa_get_hrdf_document($post_id);
+        $hrdf_post = is_array($post_doc['hrdf'] ?? null) ? $post_doc['hrdf'] : [];
+    }
     $copy_payload = [
         'context'  => $context,
         'settings' => $settings,
@@ -164,6 +173,28 @@ function hr_sa_render_debug_page(): void
                     </tr>
                 </tbody>
             </table>
+        </section>
+
+        <section class="hr-sa-section">
+            <h2><?php esc_html_e('Resolved HRDF', HR_SA_TEXT_DOMAIN); ?></h2>
+
+            <h3><?php esc_html_e('Global', HR_SA_TEXT_DOMAIN); ?></h3>
+            <?php if (!empty($hrdf_global)) : ?>
+                <?php $hrdf_global_json = wp_json_encode($hrdf_global, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES); ?>
+                <pre><code><?php echo esc_html(is_string($hrdf_global_json) ? $hrdf_global_json : '{}'); ?></code></pre>
+            <?php else : ?>
+                <p class="description"><?php esc_html_e('No global HRDF data available.', HR_SA_TEXT_DOMAIN); ?></p>
+            <?php endif; ?>
+
+            <?php if ($post_id) : ?>
+                <h3><?php esc_html_e('Current Post', HR_SA_TEXT_DOMAIN); ?></h3>
+                <?php if (!empty($hrdf_post)) : ?>
+                    <?php $hrdf_post_json = wp_json_encode($hrdf_post, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES); ?>
+                    <pre><code><?php echo esc_html(is_string($hrdf_post_json) ? $hrdf_post_json : '{}'); ?></code></pre>
+                <?php else : ?>
+                    <p class="description"><?php esc_html_e('No post-specific HRDF data available.', HR_SA_TEXT_DOMAIN); ?></p>
+                <?php endif; ?>
+            <?php endif; ?>
         </section>
 
         <section class="hr-sa-section">
