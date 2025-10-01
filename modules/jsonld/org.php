@@ -20,35 +20,53 @@ hr_sa_jsonld_register_emitter('org', 'hr_sa_jsonld_emit_org_graph');
  */
 function hr_sa_jsonld_emit_org_graph(int $post_id = 0): array
 {
-    $site_profile = hr_sa_resolve_site_profile();
-    $meta_profile = hr_sa_resolve_meta_profile($post_id);
+    $site_profile  = hr_sa_resolve_site_profile();
+    $meta_profile  = hr_sa_resolve_meta_profile($post_id);
     $image_profile = hr_sa_resolve_image_profile($post_id);
 
-    $site_url = $site_profile['url'] ?? trailingslashit((string) home_url('/'));
-    $site_name = $site_profile['name'] ?? (string) get_bloginfo('name');
-    $logo = $site_profile['logo'] ?? null;
+    $site_url = isset($site_profile['url']) && is_string($site_profile['url'])
+        ? (string) $site_profile['url']
+        : '';
+    $site_name = isset($site_profile['name']) && is_string($site_profile['name'])
+        ? (string) $site_profile['name']
+        : '';
+    $logo = isset($site_profile['logo']) && is_string($site_profile['logo'])
+        ? (string) $site_profile['logo']
+        : null;
 
-    $canonical = $meta_profile['canonical_url'] ?? $site_url;
-    $page_title = $meta_profile['title'] ?? $site_name;
+    if ($site_url === '' || $site_name === '') {
+        return [];
+    }
+
+    $canonical = $meta_profile['canonical_url'] ?? '';
+    $page_title = $meta_profile['title'] ?? '';
     $page_description = $meta_profile['description'] ?? '';
 
     $org_id     = rtrim($site_url, '/') . '#org';
     $website_id = rtrim($site_url, '/') . '#website';
-    $webpage_id = rtrim($canonical, '/') . '#webpage';
-
-    if (!hr_sa_hrdf_is_available()) {
-        static $notified = false;
-        if (!$notified) {
-            error_log('[HR SEO Assistant] HRDF helpers are unavailable. Emitting fallback Organization/WebSite schema.');
-            $notified = true;
-        }
-    }
+    $webpage_id = $canonical !== '' ? rtrim($canonical, '/') . '#webpage' : '';
 
     $organization = hr_sa_jsonld_build_organization_node($org_id, $site_url, $site_name, $logo);
-    $website      = hr_sa_jsonld_build_website_node($website_id, $site_url, $site_name, $org_id);
-    $webpage      = hr_sa_jsonld_build_webpage_node($webpage_id, $canonical, $page_title, $website_id, $org_id, $page_description, $image_profile);
+    if ($organization === null) {
+        return [];
+    }
 
-    return [$organization, $website, $webpage];
+    $website = hr_sa_jsonld_build_website_node($website_id, $site_url, $site_name, $org_id);
+    $webpage = $webpage_id !== ''
+        ? hr_sa_jsonld_build_webpage_node($webpage_id, $canonical, $page_title, $website_id, $org_id, $page_description, $image_profile)
+        : null;
+
+    $graph = [$organization];
+
+    if ($website !== null) {
+        $graph[] = $website;
+    }
+
+    if ($webpage !== null) {
+        $graph[] = $webpage;
+    }
+
+    return $graph;
 }
 
 /**
@@ -56,8 +74,12 @@ function hr_sa_jsonld_emit_org_graph(int $post_id = 0): array
  *
  * @return array<string, mixed>
  */
-function hr_sa_jsonld_build_organization_node(string $org_id, string $site_url, string $site_name, ?string $logo): array
+function hr_sa_jsonld_build_organization_node(string $org_id, string $site_url, string $site_name, ?string $logo): ?array
 {
+    if ($site_name === '' || $site_url === '') {
+        return null;
+    }
+
     $organization = [
         '@type' => 'Organization',
         '@id'   => $org_id,
@@ -65,7 +87,9 @@ function hr_sa_jsonld_build_organization_node(string $org_id, string $site_url, 
         'name'  => $site_name,
     ];
 
-    $legal_name = hr_sa_sanitize_text_value((string) hr_sa_hrdf_get('hrdf.org.legalName', 0, ''));
+    $legal_name = hr_sa_sanitize_text_value((string) hr_sa_hrdf_get_first([
+        'hrdf.org.legalName',
+    ], 0, ''));
     if ($legal_name !== '') {
         $organization['legalName'] = $legal_name;
     }
@@ -77,42 +101,59 @@ function hr_sa_jsonld_build_organization_node(string $org_id, string $site_url, 
         ];
     }
 
-    $price_range = hr_sa_sanitize_text_value((string) hr_sa_hrdf_get('hrdf.org.priceRange', 0, ''));
+    $price_range = hr_sa_sanitize_text_value((string) hr_sa_hrdf_get_first([
+        'hrdf.org.priceRange',
+    ], 0, ''));
     if ($price_range !== '') {
         $organization['priceRange'] = $price_range;
     }
 
-    $vat_id = hr_sa_sanitize_text_value((string) hr_sa_hrdf_get('hrdf.org.vatId', 0, ''));
+    $vat_id = hr_sa_sanitize_text_value((string) hr_sa_hrdf_get_first([
+        'hrdf.org.vatId',
+    ], 0, ''));
     if ($vat_id !== '') {
         $organization['vatID'] = $vat_id;
     }
 
-    $registration_number = hr_sa_sanitize_text_value((string) hr_sa_hrdf_get('hrdf.org.registrationNumber', 0, ''));
+    $registration_number = hr_sa_sanitize_text_value((string) hr_sa_hrdf_get_first([
+        'hrdf.org.registrationNumber',
+    ], 0, ''));
     if ($registration_number !== '') {
         $organization['registrationNumber'] = $registration_number;
     }
 
-    $same_as = hr_sa_jsonld_collect_urls((array) hr_sa_hrdf_get('hrdf.org.sameAs', 0, []));
+    $same_as = hr_sa_jsonld_collect_urls((array) hr_sa_hrdf_get_first([
+        'hrdf.org.sameAs',
+    ], 0, []));
     if ($same_as) {
         $organization['sameAs'] = $same_as;
     }
 
-    $contact_points = hr_sa_jsonld_prepare_contact_points((array) hr_sa_hrdf_get('hrdf.org.contactPoint', 0, []));
+    $contact_points = hr_sa_jsonld_prepare_contact_points((array) hr_sa_hrdf_get_first([
+        'hrdf.org.contactPoints',
+        'hrdf.org.contactPoint',
+    ], 0, []));
     if ($contact_points) {
         $organization['contactPoint'] = $contact_points;
     }
 
-    $address = hr_sa_jsonld_prepare_postal_address((array) hr_sa_hrdf_get('hrdf.org.address', 0, []));
+    $address = hr_sa_jsonld_prepare_postal_address((array) hr_sa_hrdf_get_first([
+        'hrdf.org.address',
+    ], 0, []));
     if ($address) {
         $organization['address'] = $address;
     }
 
-    $geo = hr_sa_jsonld_prepare_geo((array) hr_sa_hrdf_get('hrdf.org.geo', 0, []));
+    $geo = hr_sa_jsonld_prepare_geo((array) hr_sa_hrdf_get_first([
+        'hrdf.org.geo',
+    ], 0, []));
     if ($geo) {
         $organization['geo'] = $geo;
     }
 
-    $opening_hours = hr_sa_jsonld_prepare_opening_hours((array) hr_sa_hrdf_get('hrdf.org.openingHours', 0, []));
+    $opening_hours = hr_sa_jsonld_prepare_opening_hours((array) hr_sa_hrdf_get_first([
+        'hrdf.org.openingHours',
+    ], 0, []));
     if ($opening_hours) {
         $organization['openingHoursSpecification'] = $opening_hours;
     }
@@ -125,8 +166,12 @@ function hr_sa_jsonld_build_organization_node(string $org_id, string $site_url, 
  *
  * @return array<string, mixed>
  */
-function hr_sa_jsonld_build_website_node(string $website_id, string $site_url, string $site_name, string $org_id): array
+function hr_sa_jsonld_build_website_node(string $website_id, string $site_url, string $site_name, string $org_id): ?array
 {
+    if ($site_url === '' || $site_name === '') {
+        return null;
+    }
+
     $website = [
         '@type'     => 'WebSite',
         '@id'       => $website_id,
@@ -137,7 +182,10 @@ function hr_sa_jsonld_build_website_node(string $website_id, string $site_url, s
         ],
     ];
 
-    $search_template = hr_sa_hrdf_get('hrdf.site.search_url_template', 0, '');
+    $search_template = hr_sa_hrdf_get_first([
+        'hrdf.website.search_url_template',
+        'hrdf.site.search_url_template',
+    ], 0, '');
     if (is_string($search_template) && strpos($search_template, '{search_term_string}') !== false) {
         $website['potentialAction'] = [
             '@type'       => 'SearchAction',
@@ -167,7 +215,11 @@ function hr_sa_jsonld_build_webpage_node(
     string $org_id,
     string $description,
     array $image_profile
-): array {
+): ?array {
+    if ($canonical === '' || $title === '') {
+        return null;
+    }
+
     $webpage = [
         '@type'    => 'WebPage',
         '@id'      => $webpage_id,

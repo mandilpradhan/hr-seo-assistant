@@ -29,6 +29,46 @@ function hr_sa_hrdf_get(string $dot_path, int $post_id = 0, $default = null)
 }
 
 /**
+ * Retrieve the first non-empty value from a list of HRDF dot paths.
+ *
+ * @param array<int, string> $paths
+ * @param mixed              $default
+ * @return mixed
+ */
+function hr_sa_hrdf_get_first(array $paths, int $post_id = 0, $default = null)
+{
+    foreach ($paths as $path) {
+        $value = hr_sa_hrdf_get($path, $post_id, null);
+
+        if ($value === null) {
+            continue;
+        }
+
+        if (is_string($value)) {
+            if (trim($value) === '') {
+                continue;
+            }
+
+            return $value;
+        }
+
+        if (is_array($value)) {
+            if ($value === []) {
+                continue;
+            }
+
+            return $value;
+        }
+
+        if ($value !== '') {
+            return $value;
+        }
+    }
+
+    return $default;
+}
+
+/**
  * Retrieve the full HRDF document for the given post when available.
  *
  * @return array<string, mixed>
