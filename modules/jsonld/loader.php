@@ -13,8 +13,6 @@ if (!defined('ABSPATH')) {
 
 /** @var array<string, callable> $hr_sa_jsonld_emitters */
 $GLOBALS['hr_sa_jsonld_emitters'] = [];
-/** @var array<int, string> $hr_sa_jsonld_last_active_emitters */
-$GLOBALS['hr_sa_jsonld_last_active_emitters'] = [];
 
 /**
  * Register hooks for the JSON-LD module.
@@ -28,6 +26,7 @@ function hr_sa_jsonld_boot(): void
     }
 
     add_action('wp', 'hr_sa_jsonld_maybe_schedule');
+    add_action('save_post', 'hr_sa_jsonld_invalidate_post_cache');
     $booted = true;
 }
 
@@ -70,67 +69,63 @@ function hr_sa_jsonld_print_graph(): void
     }
     $printed = true;
 
-    $graph = hr_sa_jsonld_collect_graph();
+    $post_id = is_singular() ? (int) get_queried_object_id() : 0;
+
+    $cached = hr_sa_jsonld_get_cached_payload($post_id);
+    if (is_string($cached) && $cached !== '') {
+        echo $cached;
+        return;
+    }
+
+    $graph = hr_sa_jsonld_collect_graph($post_id);
     if (!$graph) {
         return;
     }
 
     $graph = hr_sa_jsonld_normalize_internal_urls($graph);
-    $graph = hr_sa_jsonld_enforce_org_and_brand($graph);
     $graph = hr_sa_jsonld_dedupe_by_id($graph);
 
-    $graph = apply_filters('hr_sa_jsonld_graph_nodes', $graph);
+    $graph = apply_filters('hr_sa_jsonld_graph_nodes', $graph, $post_id);
+
     $graph = hr_sa_jsonld_normalize_internal_urls($graph);
-    $graph = hr_sa_jsonld_enforce_org_and_brand($graph);
     $graph = hr_sa_jsonld_dedupe_by_id($graph);
 
-    $payload = [
+    $payload_array = [
         '@context' => 'https://schema.org',
         '@graph'   => array_values($graph),
     ];
 
-    echo '<script type="application/ld+json">' . hr_sa_jsonld_encode($payload) . '</script>' . PHP_EOL;
+    $json = '<script type="application/ld+json">' . hr_sa_jsonld_encode($payload_array) . '</script>' . PHP_EOL;
+
+    hr_sa_jsonld_set_cached_payload($post_id, $json);
+
+    echo $json;
 }
 
 /**
  * Collect nodes from all registered emitters.
  *
+ * @param int $post_id
  * @return array<int, array<string, mixed>>
  */
-function hr_sa_jsonld_collect_graph(): array
+function hr_sa_jsonld_collect_graph(int $post_id): array
 {
     $graph = [];
-    $active = [];
-    foreach ($GLOBALS['hr_sa_jsonld_emitters'] as $id => $callback) {
+
+    foreach ($GLOBALS['hr_sa_jsonld_emitters'] as $callback) {
         if (!is_callable($callback)) {
             continue;
         }
 
-        $nodes = (array) call_user_func($callback);
+        $nodes = (array) call_user_func($callback, $post_id);
         foreach ($nodes as $node) {
             if (is_array($node) && $node) {
                 $graph[] = $node;
             }
         }
-
-        if ($nodes) {
-            $active[] = (string) $id;
-        }
     }
 
-    $GLOBALS['hr_sa_jsonld_last_active_emitters'] = $active;
-
     return $graph;
-}
-
-/**
- * Return a list of emitter identifiers that produced nodes on the last run.
- *
- * @return array<int, string>
- */
-function hr_sa_jsonld_get_active_emitters(): array
-{
-    return $GLOBALS['hr_sa_jsonld_last_active_emitters'] ?? [];
 }
 
 /**
@@ -193,130 +188,7 @@ function hr_sa_jsonld_dedupe_by_id(array $graph): array
 }
 
 /**
- * Sanitize answer markup for FAQ nodes.
- */
-function hr_sa_jsonld_sanitize_answer_html(string $html): string
-{
-    $allowed = [
-        'p'      => [],
-        'br'     => [],
-        'ul'     => [],
-        'ol'     => [],
-        'li'     => [],
-        'strong' => [],
-        'em'     => [],
-        'b'      => [],
-        'i'      => [],
-        'a'      => [
-            'href'  => [],
-            'title' => [],
-            'rel'   => [],
-        ],
-    ];
-
-    $clean = strip_shortcodes($html);
-    $clean = wp_kses($clean, $allowed);
-    $clean = (string) preg_replace("/\r\n?/", "\n", $clean);
-    $clean = (string) preg_replace('/[ \t]+/u', ' ', $clean);
-    $clean = (string) preg_replace("/\n{3,}/u", "\n\n", $clean);
-
-    return trim($clean);
-}
-
-/**
- * Fetch schema setting from legacy option store.
- *
- * @param mixed $default
- * @return mixed
- */
-function hr_sa_jsonld_get_schema_option(string $key, $default = '')
-{
-    $options = get_option('hr_schema_settings', []);
-    if (is_array($options) && array_key_exists($key, $options) && $options[$key] !== '') {
-        return $options[$key];
-    }
-
-    return $default;
-}
-
-/**
- * Resolve the Organization logo URL.
- */
-function hr_sa_jsonld_get_logo_url(): string
-{
-    $logo_id = (int) hr_sa_jsonld_get_schema_option('org_logo_id', 0);
-    if ($logo_id > 0) {
-        $url = wp_get_attachment_image_url($logo_id, 'full');
-        if ($url) {
-            return $url;
-        }
-    }
-
-    $theme_logo_id = (int) get_theme_mod('custom_logo');
-    if ($theme_logo_id > 0) {
-        $url = wp_get_attachment_image_url($theme_logo_id, 'full');
-        if ($url) {
-            return $url;
-        }
-    }
-
-    return '';
-}
-
-/**
- * Canonical HTTPS site URL with trailing slash.
- */
-function hr_sa_jsonld_site_url(): string
-{
-    static $site = '';
-    if ($site !== '') {
-        return $site;
-    }
-
-    $site = trailingslashit(set_url_scheme(home_url('/'), 'https'));
-    return $site;
-}
-
-function hr_sa_jsonld_org_id(): string
-{
-    return hr_sa_jsonld_site_url() . '#org';
-}
-
-function hr_sa_jsonld_website_id(): string
-{
-    return hr_sa_jsonld_site_url() . '#website';
-}
-
-/**
- * Determine current URL similar to legacy behavior.
- */
-function hr_sa_jsonld_current_url(): string
-{
-    if (is_front_page() || is_home()) {
-        return hr_sa_jsonld_site_url();
-    }
-
-    if (is_singular()) {
-        $permalink = get_permalink();
-        if ($permalink) {
-            return trailingslashit($permalink);
-        }
-    }
-
-    global $wp;
-    if ($wp instanceof WP) {
-        $request = (string) $wp->request;
-        if ($request !== '') {
-            return home_url(add_query_arg([], $request));
-        }
-    }
-
-    $uri = isset($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '/';
-    return home_url($uri);
-}
-
-/**
- * Force all internal URLs to HTTPS.
+ * Force internal URLs to HTTPS using the resolved site host.
  *
  * @param array<int, array<string, mixed>> $graph
  *
@@ -324,7 +196,10 @@ function hr_sa_jsonld_current_url(): string
  */
 function hr_sa_jsonld_normalize_internal_urls(array $graph): array
 {
-    $host = wp_parse_url(hr_sa_jsonld_site_url(), PHP_URL_HOST);
+    $site_profile = hr_sa_resolve_site_profile();
+    $site_url     = $site_profile['url'] ?? '';
+    $host         = $site_url ? wp_parse_url($site_url, PHP_URL_HOST) : null;
+
     if (!$host) {
         return $graph;
     }
@@ -358,190 +233,39 @@ function hr_sa_jsonld_normalize_internal_urls(array $graph): array
 }
 
 /**
- * Ensure Organization node exists and referenced by Product.brand.
- *
- * @param array<int, array<string, mixed>> $graph
- *
- * @return array<int, array<string, mixed>>
+ * Retrieve cached JSON-LD payload when available.
  */
-function hr_sa_jsonld_enforce_org_and_brand(array $graph): array
+function hr_sa_jsonld_get_cached_payload(int $post_id): ?string
 {
-    $org_id  = hr_sa_jsonld_org_id();
-    $site    = hr_sa_jsonld_site_url();
-    $has_org = false;
+    $cache_key = hr_sa_jsonld_cache_key($post_id);
+    $cached    = get_transient($cache_key);
 
-    foreach ($graph as $index => $node) {
-        if (!is_array($node)) {
-            continue;
-        }
-
-        $types = hr_sa_jsonld_normalize_type($node['@type'] ?? null);
-        if (in_array('Organization', $types, true)) {
-            $graph[$index]['@id'] = $org_id;
-            $graph[$index]['url'] = $site;
-            $has_org = true;
-        }
-    }
-
-    if (!$has_org) {
-        $graph[] = hr_sa_jsonld_build_organization_node();
-    }
-
-    foreach ($graph as $index => $node) {
-        if (!is_array($node)) {
-            continue;
-        }
-
-        $types = hr_sa_jsonld_normalize_type($node['@type'] ?? null);
-        if (in_array('Product', $types, true)) {
-            $graph[$index]['brand'] = [
-                '@type' => 'Brand',
-                '@id'   => $org_id,
-            ];
-        }
-    }
-
-    return $graph;
+    return is_string($cached) ? $cached : null;
 }
 
 /**
- * Build the Organization node using legacy settings.
+ * Persist the cached JSON-LD payload for the post.
  */
-function hr_sa_jsonld_build_organization_node(): array
+function hr_sa_jsonld_set_cached_payload(int $post_id, string $payload): void
 {
-    $site_url    = hr_sa_jsonld_site_url();
-    $organization = [
-        '@type' => 'Organization',
-        '@id'   => hr_sa_jsonld_org_id(),
-        'name'  => (string) hr_sa_jsonld_get_schema_option('org_name', get_bloginfo('name')),
-        'url'   => $site_url,
-    ];
-
-    $logo_url = hr_sa_jsonld_get_logo_url();
-    if ($logo_url) {
-        $organization['logo'] = [
-            '@type' => 'ImageObject',
-            'url'   => $logo_url,
-        ];
-    }
-
-    $optionals = [
-        'legalName'    => 'org_legal_name',
-        'slogan'       => 'org_slogan',
-        'description'  => 'org_description',
-        'foundingDate' => 'org_founding_date',
-    ];
-
-    foreach ($optionals as $field => $key) {
-        $value = hr_sa_jsonld_get_schema_option($key);
-        if ($value !== '') {
-            $organization[$field] = $value;
-        }
-    }
-
-    $address = [
-        'streetAddress'   => hr_sa_jsonld_get_schema_option('org_address_street'),
-        'addressLocality' => hr_sa_jsonld_get_schema_option('org_address_locality'),
-        'addressRegion'   => hr_sa_jsonld_get_schema_option('org_address_region'),
-        'postalCode'      => hr_sa_jsonld_get_schema_option('org_address_postal'),
-        'addressCountry'  => hr_sa_jsonld_get_schema_option('org_address_country'),
-    ];
-
-    if (array_filter($address, static fn($value) => $value !== '')) {
-        $organization['address'] = array_merge(['@type' => 'PostalAddress'], $address);
-    }
-
-    $same_as_raw = hr_sa_jsonld_get_schema_option('org_sameas', '');
-    if ($same_as_raw !== '') {
-        $same_as = [];
-        foreach (preg_split('/\r\n|\r|\n/', (string) $same_as_raw) as $line) {
-            $line = trim((string) $line);
-            if ($line === '') {
-                continue;
-            }
-            $same_as[] = esc_url_raw($line);
-        }
-        if ($same_as) {
-            $organization['sameAs'] = $same_as;
-        }
-    }
-
-    $contact_points_raw = hr_sa_jsonld_get_schema_option('org_contact_points', '');
-    if ($contact_points_raw !== '') {
-        $decoded = json_decode((string) $contact_points_raw, true);
-        if (is_array($decoded) && $decoded) {
-            $contact_points = [];
-            foreach ($decoded as $row) {
-                if (!is_array($row)) {
-                    continue;
-                }
-
-                $contact_point = ['@type' => 'ContactPoint'];
-                if (!empty($row['contactType'])) {
-                    $contact_point['contactType'] = $row['contactType'];
-                }
-                if (!empty($row['telephone'])) {
-                    $contact_point['telephone'] = preg_replace('/\s+/u', '', (string) $row['telephone']);
-                }
-                if (!empty($row['email'])) {
-                    $contact_point['email'] = $row['email'];
-                }
-                if (!empty($row['areaServed'])) {
-                    $contact_point['areaServed'] = $row['areaServed'];
-                }
-                if (!empty($row['availableLanguage'])) {
-                    $contact_point['availableLanguage'] = $row['availableLanguage'];
-                }
-                if (!empty($row['contactOption'])) {
-                    $contact_point['contactOption'] = $row['contactOption'];
-                }
-
-                if (!empty($contact_point['telephone']) || !empty($contact_point['email'])) {
-                    $contact_points[] = $contact_point;
-                }
-            }
-
-            if ($contact_points) {
-                $organization['contactPoint'] = $contact_points;
-            }
-        }
-    }
-
-    return $organization;
+    set_transient(hr_sa_jsonld_cache_key($post_id), $payload, 10 * MINUTE_IN_SECONDS);
 }
 
 /**
- * Build the WebSite node.
+ * Delete cached payload when a post is saved.
  */
-function hr_sa_jsonld_build_website_node(): array
+function hr_sa_jsonld_invalidate_post_cache(int $post_id): void
 {
-    return [
-        '@type' => 'WebSite',
-        '@id'   => hr_sa_jsonld_website_id(),
-        'url'   => hr_sa_jsonld_site_url(),
-        'name'  => get_bloginfo('name'),
-    ];
+    delete_transient(hr_sa_jsonld_cache_key((int) $post_id));
 }
 
 /**
- * Build the WebPage node for the current view.
+ * Build the cache key for a given post.
  */
-function hr_sa_jsonld_build_webpage_node(): array
+function hr_sa_jsonld_cache_key(int $post_id): string
 {
-    $current_url = hr_sa_jsonld_current_url();
-
-    return [
-        '@type'    => 'WebPage',
-        '@id'      => trailingslashit($current_url) . '#webpage',
-        'url'      => $current_url,
-        'name'     => function_exists('wp_get_document_title') ? wp_get_document_title() : get_the_title(),
-        'isPartOf' => ['@id' => hr_sa_jsonld_website_id()],
-        'about'    => ['@id' => hr_sa_jsonld_org_id()],
-    ];
+    return 'seo_jsonld_' . $post_id;
 }
 
 require_once __DIR__ . '/org.php';
-require_once __DIR__ . '/itinerary.php';
-require_once __DIR__ . '/faq.php';
-require_once __DIR__ . '/vehicles.php';
 require_once __DIR__ . '/trip.php';

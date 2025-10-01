@@ -250,7 +250,8 @@ function hr_sa_ai_prepare_post_context(int $post_id): array
     $content     = hr_sa_ai_prepare_snippet($content_raw, 1200);
 
     $permalink = get_permalink($post_id);
-    $site_name = hr_sa_ai_prepare_snippet((string) hr_sa_get_setting('hr_sa_site_name', get_bloginfo('name')), 120);
+    $site_profile = hr_sa_resolve_site_profile();
+    $site_name    = hr_sa_ai_prepare_snippet((string) ($site_profile['name'] ?? get_bloginfo('name')), 120);
 
     $context = [
         'post_id'       => $post_id,
