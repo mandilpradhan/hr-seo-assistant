@@ -18,24 +18,8 @@ if (!defined('ABSPATH')) {
  */
 function hr_sa_get_settings_view_model(): array
 {
-    $fallback      = (string) hr_sa_get_setting('hr_sa_fallback_image', '');
     $og_enabled    = hr_sa_is_flag_enabled('hr_sa_og_enabled', false);
     $twitter_cards = hr_sa_is_flag_enabled('hr_sa_twitter_enabled', false);
-    $tpl_trip      = (string) hr_sa_get_setting('hr_sa_tpl_trip');
-    $tpl_page      = (string) hr_sa_get_setting('hr_sa_tpl_page');
-    $brand_suffix  = (bool) hr_sa_get_setting('hr_sa_tpl_page_brand_suffix');
-    $locale        = (string) hr_sa_get_setting('hr_sa_locale');
-    $locale_choices = hr_sa_get_locale_choices();
-    if ($locale !== '' && !array_key_exists($locale, $locale_choices)) {
-        $locale_choices = [$locale => sprintf(__('Current (custom): %s', HR_SA_TEXT_DOMAIN), $locale)] + $locale_choices;
-    }
-    $site_name     = (string) hr_sa_get_setting('hr_sa_site_name', get_bloginfo('name'));
-    $twitter       = (string) hr_sa_get_setting('hr_sa_twitter_handle');
-    $image_replace_enabled = (bool) hr_sa_get_setting('hr_sa_image_url_replace_enabled');
-    $image_prefix_find     = (string) hr_sa_get_setting('hr_sa_image_url_prefix_find');
-    $image_prefix_replace  = (string) hr_sa_get_setting('hr_sa_image_url_prefix_replace');
-    $image_suffix_find     = (string) hr_sa_get_setting('hr_sa_image_url_suffix_find');
-    $image_suffix_replace  = (string) hr_sa_get_setting('hr_sa_image_url_suffix_replace');
     $conflict_mode = hr_sa_get_conflict_mode();
     $debug_enabled = hr_sa_is_debug_enabled();
     $ai_settings   = hr_sa_get_ai_settings();
@@ -48,21 +32,9 @@ function hr_sa_get_settings_view_model(): array
     $ai_has_key    = $ai_settings['hr_sa_ai_api_key'] !== '';
 
     return [
-        'fallback'               => $fallback,
         'og_enabled'             => $og_enabled,
         'twitter_cards'          => $twitter_cards,
-        'tpl_trip'               => $tpl_trip,
-        'tpl_page'               => $tpl_page,
-        'brand_suffix'           => $brand_suffix,
-        'locale'                 => $locale,
-        'locale_choices'         => $locale_choices,
-        'site_name'              => $site_name,
-        'twitter'                => $twitter,
-        'image_replace_enabled'  => $image_replace_enabled,
-        'image_prefix_find'      => $image_prefix_find,
-        'image_prefix_replace'   => $image_prefix_replace,
-        'image_suffix_find'      => $image_suffix_find,
-        'image_suffix_replace'   => $image_suffix_replace,
+        'hrdf_only'              => hr_sa_is_hrdf_only_mode(),
         'conflict_mode'          => $conflict_mode,
         'debug_enabled'          => $debug_enabled,
         'ai_enabled'             => $ai_enabled,
@@ -84,34 +56,20 @@ function hr_sa_render_settings_page(): void
         wp_die(esc_html__('You do not have permission to access this page.', HR_SA_TEXT_DOMAIN));
     }
 
-    $fallback      = (string) hr_sa_get_setting('hr_sa_fallback_image', '');
-    $og_enabled    = hr_sa_is_flag_enabled('hr_sa_og_enabled', false);
-    $twitter_cards = hr_sa_is_flag_enabled('hr_sa_twitter_enabled', false);
-    $tpl_trip      = (string) hr_sa_get_setting('hr_sa_tpl_trip');
-    $tpl_page      = (string) hr_sa_get_setting('hr_sa_tpl_page');
-    $brand_suffix  = (bool) hr_sa_get_setting('hr_sa_tpl_page_brand_suffix');
-    $locale        = (string) hr_sa_get_setting('hr_sa_locale');
-    $locale_choices = hr_sa_get_locale_choices();
-    if ($locale !== '' && !array_key_exists($locale, $locale_choices)) {
-        $locale_choices = [$locale => sprintf(__('Current (custom): %s', HR_SA_TEXT_DOMAIN), $locale)] + $locale_choices;
-    }
-    $site_name     = (string) hr_sa_get_setting('hr_sa_site_name', get_bloginfo('name'));
-    $twitter       = (string) hr_sa_get_setting('hr_sa_twitter_handle');
-    $image_replace_enabled = (bool) hr_sa_get_setting('hr_sa_image_url_replace_enabled');
-    $image_prefix_find     = (string) hr_sa_get_setting('hr_sa_image_url_prefix_find');
-    $image_prefix_replace  = (string) hr_sa_get_setting('hr_sa_image_url_prefix_replace');
-    $image_suffix_find     = (string) hr_sa_get_setting('hr_sa_image_url_suffix_find');
-    $image_suffix_replace  = (string) hr_sa_get_setting('hr_sa_image_url_suffix_replace');
-    $conflict_mode = hr_sa_get_conflict_mode();
-    $debug_enabled = hr_sa_is_debug_enabled();
-    $ai_settings   = hr_sa_get_ai_settings();
-    $ai_enabled    = (bool) $ai_settings['hr_sa_ai_enabled'];
-    $ai_model      = (string) $ai_settings['hr_sa_ai_model'];
-    $ai_temperature = (float) $ai_settings['hr_sa_ai_temperature'];
-    $ai_max_tokens = (int) $ai_settings['hr_sa_ai_max_tokens'];
-    $ai_global_instructions = (string) $ai_settings['hr_sa_ai_global_instructions'];
-    $ai_key_masked = hr_sa_mask_api_key_for_display($ai_settings['hr_sa_ai_api_key']);
-    $ai_has_key    = $ai_settings['hr_sa_ai_api_key'] !== '';
+    $view          = hr_sa_get_settings_view_model();
+    $og_enabled    = (bool) $view['og_enabled'];
+    $twitter_cards = (bool) $view['twitter_cards'];
+    $conflict_mode = (string) $view['conflict_mode'];
+    $debug_enabled = (bool) $view['debug_enabled'];
+    $ai_enabled    = (bool) $view['ai_enabled'];
+    $ai_model      = (string) $view['ai_model'];
+    $ai_temperature = (float) $view['ai_temperature'];
+    $ai_max_tokens = (int) $view['ai_max_tokens'];
+    $ai_global_instructions = (string) $view['ai_global_instructions'];
+    $ai_key_masked = (string) $view['ai_key_masked'];
+    $ai_has_key    = (bool) $view['ai_has_key'];
+    $hrdf_locked   = defined('HR_SA_HRDF_ONLY');
+    $hrdf_default  = $hrdf_locked ? (bool) HR_SA_HRDF_ONLY : (bool) $view['hrdf_only'];
 
     $updated_flag = isset($_GET['settings-updated'])
         ? sanitize_text_field(wp_unslash((string) $_GET['settings-updated']))
@@ -136,13 +94,22 @@ function hr_sa_render_settings_page(): void
             <table class="form-table" role="presentation">
                 <tbody>
                     <tr>
-                        <th scope="row"><label for="hr_sa_fallback_image"><?php esc_html_e('Fallback Image (Sitewide)', HR_SA_TEXT_DOMAIN); ?></label></th>
+                        <th scope="row"><?php esc_html_e('Data Source', HR_SA_TEXT_DOMAIN); ?></th>
                         <td>
-                            <div class="hr-sa-media-field">
-                                <input type="url" class="regular-text" id="hr_sa_fallback_image" name="hr_sa_fallback_image" value="<?php echo esc_attr($fallback); ?>" placeholder="https://" />
-                                <button type="button" class="button hr-sa-media-picker" data-target="hr_sa_fallback_image"><?php esc_html_e('Choose Image', HR_SA_TEXT_DOMAIN); ?></button>
-                            </div>
-                            <p class="description"><?php esc_html_e('Used when no hero image is provided. Must be an absolute HTTPS URL.', HR_SA_TEXT_DOMAIN); ?></p>
+                            <fieldset>
+                                <legend class="screen-reader-text"><?php esc_html_e('Data Source', HR_SA_TEXT_DOMAIN); ?></legend>
+                                <?php if ($hrdf_locked) : ?>
+                                    <input type="hidden" name="hr_sa_hrdf_only_mode" value="<?php echo esc_attr($hrdf_default ? '1' : '0'); ?>" />
+                                <?php endif; ?>
+                                <label for="hr_sa_hrdf_only_mode">
+                                    <input type="checkbox" id="hr_sa_hrdf_only_mode" name="hr_sa_hrdf_only_mode" value="1" <?php checked($hrdf_default); ?> <?php disabled($hrdf_locked); ?> />
+                                    <?php esc_html_e('Use HRDF-only mode (no legacy data sources)', HR_SA_TEXT_DOMAIN); ?>
+                                </label>
+                                <p class="description"><?php esc_html_e('When enabled, JSON-LD and Open Graph data is read directly from HRDF with minimal WordPress fallbacks.', HR_SA_TEXT_DOMAIN); ?></p>
+                                <?php if ($hrdf_locked) : ?>
+                                    <p class="description"><?php esc_html_e('This option is locked by the HR_SA_HRDF_ONLY constant.', HR_SA_TEXT_DOMAIN); ?></p>
+                                <?php endif; ?>
+                            </fieldset>
                         </td>
                     </tr>
                     <tr>
@@ -159,7 +126,7 @@ function hr_sa_render_settings_page(): void
                                     <input type="checkbox" id="hr_sa_twitter_enabled" name="hr_sa_twitter_enabled" value="1" <?php checked($twitter_cards); ?> />
                                     <?php esc_html_e('Enable Twitter Card tags', HR_SA_TEXT_DOMAIN); ?>
                                 </label>
-                                <p class="description"><?php esc_html_e('Twitter Cards reuse Open Graph data and require a large hero image or fallback.', HR_SA_TEXT_DOMAIN); ?></p>
+                                <p class="description"><?php esc_html_e('Twitter Cards reuse Open Graph values and require an HRDF hero image or fallback.', HR_SA_TEXT_DOMAIN); ?></p>
                             </fieldset>
                         </td>
                     </tr>
@@ -206,79 +173,6 @@ function hr_sa_render_settings_page(): void
                                         <p><?php esc_html_e('AI assistance is enabled, but no API key has been provided yet.', HR_SA_TEXT_DOMAIN); ?></p>
                                     </div>
                                 <?php endif; ?>
-                            </fieldset>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><?php esc_html_e('Title Templates', HR_SA_TEXT_DOMAIN); ?></th>
-                        <td>
-                            <fieldset>
-                                <legend class="screen-reader-text"><?php esc_html_e('Title Templates', HR_SA_TEXT_DOMAIN); ?></legend>
-                                <label for="hr_sa_tpl_trip"><?php esc_html_e('Trips', HR_SA_TEXT_DOMAIN); ?></label>
-                                <input type="text" class="regular-text" id="hr_sa_tpl_trip" name="hr_sa_tpl_trip" value="<?php echo esc_attr($tpl_trip); ?>" />
-                                <p class="description"><?php esc_html_e('Available tags: {{trip_name}}, {{country}}', HR_SA_TEXT_DOMAIN); ?></p>
-                                <label for="hr_sa_tpl_page" class="hr-sa-template-label"><?php esc_html_e('Pages', HR_SA_TEXT_DOMAIN); ?></label>
-                                <input type="text" class="regular-text" id="hr_sa_tpl_page" name="hr_sa_tpl_page" value="<?php echo esc_attr($tpl_page); ?>" />
-                                <label for="hr_sa_tpl_page_brand_suffix">
-                                    <input type="checkbox" id="hr_sa_tpl_page_brand_suffix" name="hr_sa_tpl_page_brand_suffix" value="1" <?php checked($brand_suffix); ?> />
-                                    <?php esc_html_e('Append brand suffix', HR_SA_TEXT_DOMAIN); ?>
-                                </label>
-                            </fieldset>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><label for="hr_sa_locale_selector"><?php esc_html_e('Locale', HR_SA_TEXT_DOMAIN); ?></label></th>
-                        <td>
-                            <select id="hr_sa_locale_selector" class="hr-sa-locale-selector" name="hr_sa_locale">
-                                <?php foreach ($locale_choices as $code => $label) : ?>
-                                    <option value="<?php echo esc_attr($code); ?>"<?php selected($locale, $code); ?>>
-                                        <?php echo esc_html($label); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <p class="description"><?php esc_html_e('Choose the locale used for generated metadata (e.g., en_US).', HR_SA_TEXT_DOMAIN); ?></p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><label for="hr_sa_site_name"><?php esc_html_e('Site Name', HR_SA_TEXT_DOMAIN); ?></label></th>
-                        <td>
-                            <input type="text" id="hr_sa_site_name" name="hr_sa_site_name" value="<?php echo esc_attr($site_name); ?>" class="regular-text" />
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><label for="hr_sa_twitter_handle"><?php esc_html_e('Twitter Handle', HR_SA_TEXT_DOMAIN); ?></label></th>
-                        <td>
-                            <input type="text" id="hr_sa_twitter_handle" name="hr_sa_twitter_handle" value="<?php echo esc_attr($twitter); ?>" class="regular-text" placeholder="@username" />
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><?php esc_html_e('Image URL Prefix/Suffix Replace', HR_SA_TEXT_DOMAIN); ?></th>
-                        <td>
-                            <fieldset>
-                                <legend class="screen-reader-text"><?php esc_html_e('Image URL Prefix and Suffix Replacement', HR_SA_TEXT_DOMAIN); ?></legend>
-                                <label for="hr_sa_image_url_replace_enabled">
-                                    <input type="checkbox" id="hr_sa_image_url_replace_enabled" name="hr_sa_image_url_replace_enabled" value="1" <?php checked($image_replace_enabled); ?> />
-                                    <?php esc_html_e('Enable prefix/suffix replacement', HR_SA_TEXT_DOMAIN); ?>
-                                </label>
-                                <p class="description"><?php esc_html_e('Rewrite Open Graph image URLs using the rules below.', HR_SA_TEXT_DOMAIN); ?></p>
-                                <div class="hr-sa-image-replace-grid">
-                                    <div class="hr-sa-image-replace-field">
-                                        <label for="hr_sa_image_url_prefix_find"><?php esc_html_e('Prefix Find', HR_SA_TEXT_DOMAIN); ?></label>
-                                        <input type="text" class="regular-text" id="hr_sa_image_url_prefix_find" name="hr_sa_image_url_prefix_find" value="<?php echo esc_attr($image_prefix_find); ?>" />
-                                    </div>
-                                    <div class="hr-sa-image-replace-field">
-                                        <label for="hr_sa_image_url_prefix_replace"><?php esc_html_e('Prefix Replace', HR_SA_TEXT_DOMAIN); ?></label>
-                                        <input type="text" class="regular-text" id="hr_sa_image_url_prefix_replace" name="hr_sa_image_url_prefix_replace" value="<?php echo esc_attr($image_prefix_replace); ?>" />
-                                    </div>
-                                    <div class="hr-sa-image-replace-field">
-                                        <label for="hr_sa_image_url_suffix_find"><?php esc_html_e('Suffix Find', HR_SA_TEXT_DOMAIN); ?></label>
-                                        <input type="text" class="regular-text" id="hr_sa_image_url_suffix_find" name="hr_sa_image_url_suffix_find" value="<?php echo esc_attr($image_suffix_find); ?>" />
-                                    </div>
-                                    <div class="hr-sa-image-replace-field">
-                                        <label for="hr_sa_image_url_suffix_replace"><?php esc_html_e('Suffix Replace', HR_SA_TEXT_DOMAIN); ?></label>
-                                        <input type="text" class="regular-text" id="hr_sa_image_url_suffix_replace" name="hr_sa_image_url_suffix_replace" value="<?php echo esc_attr($image_suffix_replace); ?>" />
-                                    </div>
-                                </div>
                             </fieldset>
                         </td>
                     </tr>

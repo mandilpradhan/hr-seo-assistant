@@ -12,6 +12,16 @@ You will receive a detailed spec next. Please follow it literally, keeping namin
 
 ---
 
+# 🚨 2024 Update — HRDF-only Mode
+
+The plugin has been refactored to source JSON-LD, Open Graph, and Twitter metadata directly from **HRDF**. Treat any legacy references below to site-name/fallback-image/template settings as historical context only. Current expectations are:
+
+- HRDF provides the canonical values for Organization, WebSite, WebPage, Trip/Product, Itinerary, FAQ, Reviews, Bikes, hero/gallery images, and policy links. WordPress fallbacks (site name, permalink, excerpt, featured image) are used only when HRDF omits a value.
+- Settings focus on enabling HRDF-only mode (default **on**), toggling OG/Twitter emission, selecting conflict mode, enabling debug tools, and configuring optional AI helpers. Options such as `hr_sa_site_name`, `hr_sa_twitter_handle`, fallback images, and title templates have been removed.
+- A CLI command `wp hr-seo test-doc <post_id>` outputs a compact snapshot of the HRDF-derived meta/hero/org/site values for verification.
+
+---
+
 # 🔧 CODEX BUILD BRIEF — HR SEO Assistant (Phase 0: Scaffold & JSON-LD Adoption, OG OFF)
 
 **Repo:** `git@github.com:mandilpradhan/hr-seo-assistant.git`  
@@ -96,32 +106,32 @@ hr-seo-assistant/
 
 ---
 
-## 3) Settings (Phase 0 UI & Storage)
+## 3) Settings (Current UI & Storage)
 
-Create a **Settings** page (WP Admin → left nav **HR SEO** → **Settings**) with these fields:
+Create a **Settings** page (WP Admin → **HR SEO → Settings**) that reflects the HRDF-only architecture:
 
-- **Fallback Image (Sitewide):** media picker (string URL)  
-  - option: `hr_sa_fallback_image`
-- **Title Templates:**
-  - Trips: `{{trip_name}} | Motorcycle Tour in {{country}}` → `hr_sa_tpl_trip`
-  - Pages: `{{page_title}}` (boolean “Append brand suffix” toggle)  
-    - options: `hr_sa_tpl_page`, `hr_sa_tpl_page_brand_suffix` (bool)
-- **Locale:** default `en_US` → `hr_sa_locale`
-- **Site Name:** prefill from `get_bloginfo('name')` (editable) → `hr_sa_site_name`
-- **Twitter Handle:** `@himalayanrides` (optional) → `hr_sa_twitter_handle`
-- **Image Preset (CDN):** default `w=1200,fit=cover,gravity=auto,format=auto,quality=75` → `hr_sa_image_preset`
-- **Conflict Mode:** radio: **Respect** (default) / **Force** → `hr_sa_conflict_mode`
-- **Debug Mode:** toggle → `hr_sa_debug_enabled`
+- **Data Source:**
+  - Checkbox labeled “Use HRDF-only mode (no legacy data sources)” → option `hr_sa_hrdf_only_mode` (default checked). Store as `'1'`/`'0'` via a checkbox sanitizer. Respect the `HR_SA_HRDF_ONLY` constant by locking the control when defined.
+- **Social Metadata:**
+  - Checkbox “Enable Open Graph tags” → `hr_sa_og_enabled`.
+  - Checkbox “Enable Twitter Card tags” → `hr_sa_twitter_enabled`.
+- **AI Assistance (admin-only):**
+  - Checkbox “Enable AI assistance for administrators” → `hr_sa_ai_enabled`.
+  - Password field `hr_sa_ai_api_key` (supports masked value preservation).
+  - Text input `hr_sa_ai_model` (default `gpt-4o-mini`).
+  - Number inputs `hr_sa_ai_temperature` (0–2, step 0.1) and `hr_sa_ai_max_tokens` (1–4096).
+  - Textarea `hr_sa_ai_global_instructions`.
+- **Conflict Mode:** radio buttons for **Respect**, **Force**, **Block other OG/Twitter** → stored in `hr_sa_conflict_mode` (normalized to `respect`, `force`, or `block_og`). Mirror respect-mode into feature flag `hr_sa_respect_other_seo` for runtime checks.
+- **Debug Mode:** checkbox “Enable Debug tools” → `hr_sa_debug_enabled`.
 
 **Sanitization rules**
-- URLs must be absolute HTTPS.
-- Strings trimmed; normalize Twitter handle to include `@`.
-- Locale must match `xx_XX` pattern or fallback to `en_US`.
+- Checkboxes persist as `'1'`/`'0'` strings.
+- Conflict mode coerced to the allowed set (`respect`, `force`, `block_og`).
+- AI inputs trimmed and sanitized (API key preserves previous value when mask submitted; temperature clamped to 0–2; max tokens clamped to 1–4096; instructions sanitized via `sanitize_textarea_field`).
 
 **UI notes**
-- Use core WP settings API.  
-- Group fields in clear sections (General, Titles, Images, Advanced).  
-- After save, show admin notice.
+- Use the WordPress Settings API and group controls under clear fieldsets (Data Source, Social Metadata, AI Assistance, Conflict Mode, Debug).
+- Display success/error notices after save using `settings_errors()`.
 
 ---
 
@@ -154,8 +164,8 @@ Create menu **HR SEO** with subpages: **Overview**, **Settings**, **Modules**, *
 - In Phase 0, display status only (no toggles required).
 
 **Debug page** (read-only surface)
-- **Environment:** Post ID, Post Type, Template (if any), Current URL, Conflict Mode, Flags (jsonld/og/debug).
-- **Context (`hr_sa_get_context`):** `url, type, title (placeholder ok), description (placeholder ok), country (placeholder ok), site_name, locale, twitter_handle, hero_url`.
+- **Environment:** Post ID, Post Type, Template (if any), Current URL, Conflict Mode, Flags (jsonld/og/debug/ai).
+- **Context (`hr_sa_get_context`):** show HRDF-derived `title`, `description`, `url`, `canonical`, `site_name`, `site_url`, `hero_url`, `images[]`, `type`, `og_type`, `hrdf_available`, `is_trip`.
 - **Connectors:** whether `hr_mh_current_hero_url` resolves (Yes/No) + its value.
 - **Settings snapshot:** all settings from Section 3.
 - **Modules:** which JSON-LD emitters are active (list submodules).
@@ -169,14 +179,13 @@ Create `core/context.php` with:
 
 - Function `hr_sa_get_context()` building an **assoc array** and returning it through `apply_filters('hr_sa_get_context', $ctx)`.
 
-For Phase 0, populate at minimum:
-- `url` (canonical guess via `get_permalink()` for singular; `home_url()` otherwise)
-- `type` (`trip` for the custom post type if present; else `page` or `home`)
-- `site_name` (setting or `get_bloginfo('name')`)
-- `locale` (setting or `get_locale()`)
-- `twitter_handle` (setting)
-- `hero_url` (via `apply_filters('hr_mh_current_hero_url', null)` — may be `null`)
-- `title`, `description`, `country` → **placeholder values** OK in Phase 0 (will be wired in Phase 1)
+For the HRDF build, ensure the context hydrates:
+- `title`, `description`, `canonical_url`, and `og_type` from `hrdf.meta.*` with WordPress fallbacks (title/excerpt/permalink) when HRDF omits values.
+- `url`/`canonical` pointing to the resolved canonical URL.
+- `site_name`, `site_url`, `logo` sourced from `hrdf.site.*` with WordPress fallbacks (blog name, home URL, site icon).
+- `hero_url` plus `images[]` composed from `hrdf.hero.image_url`, `hrdf.gallery.images[]`, and `hrdf.trip.gallery.images[]`, falling back to the featured image.
+- `type` (`trip`, `page`, or `home`) and derived `og_type` (defaults to `product` for trips, `website` for home, `article` otherwise when HRDF is silent).
+- `hrdf_available` boolean, `is_trip` flag, and any other module-facing helpers needed by OG/JSON-LD.
 
 Do **not** emit OG/Twitter here — context is for JSON-LD & later OG.
 

@@ -19,48 +19,17 @@ if (!defined('ABSPATH')) {
 function hr_sa_get_settings_defaults(): array
 {
     return [
-        'hr_sa_fallback_image'           => '',
-        'hr_sa_tpl_trip'                 => '{{trip_name}} | Motorcycle Tour in {{country}}',
-        'hr_sa_tpl_page'                 => '{{page_title}}',
-        // TODO: Confirm whether the brand suffix should default to enabled or disabled.
-        'hr_sa_tpl_page_brand_suffix'    => '1',
-        'hr_sa_locale'                   => 'en_US',
-        'hr_sa_site_name'                => get_bloginfo('name'),
-        'hr_sa_twitter_handle'           => '@himalayanrides',
-        'hr_sa_image_url_replace_enabled' => '0',
-        'hr_sa_image_url_prefix_find'    => '',
-        'hr_sa_image_url_prefix_replace' => '',
-        'hr_sa_image_url_suffix_find'    => '',
-        'hr_sa_image_url_suffix_replace' => '',
-        'hr_sa_conflict_mode'            => 'respect',
-        'hr_sa_debug_enabled'            => '0',
-        'hr_sa_ai_enabled'               => '0',
-        'hr_sa_ai_api_key'               => '',
-        'hr_sa_ai_model'                 => 'gpt-4o-mini',
-        'hr_sa_ai_temperature'           => '0.7',
-        'hr_sa_ai_max_tokens'            => '256',
-        'hr_sa_ai_global_instructions'   => '',
-    ];
-}
-
-/**
- * Provide a curated list of common locale choices for the settings UI.
- *
- * @return array<string, string> Map of locale code to human readable label.
- */
-function hr_sa_get_locale_choices(): array
-{
-    return [
-        'en_US' => __('English (United States)', HR_SA_TEXT_DOMAIN),
-        'en_GB' => __('English (United Kingdom)', HR_SA_TEXT_DOMAIN),
-        'es_ES' => __('Spanish (Spain)', HR_SA_TEXT_DOMAIN),
-        'fr_FR' => __('French (France)', HR_SA_TEXT_DOMAIN),
-        'de_DE' => __('German (Germany)', HR_SA_TEXT_DOMAIN),
-        'hi_IN' => __('Hindi (India)', HR_SA_TEXT_DOMAIN),
-        'ne_NP' => __('Nepali (Nepal)', HR_SA_TEXT_DOMAIN),
-        'it_IT' => __('Italian (Italy)', HR_SA_TEXT_DOMAIN),
-        'th_TH' => __('Thai (Thailand)', HR_SA_TEXT_DOMAIN),
-        'zh_CN' => __('Chinese (Simplified)', HR_SA_TEXT_DOMAIN),
+        'hr_sa_hrdf_only_mode'        => '1',
+        'hr_sa_og_enabled'            => '0',
+        'hr_sa_twitter_enabled'       => '0',
+        'hr_sa_conflict_mode'         => 'respect',
+        'hr_sa_debug_enabled'         => '0',
+        'hr_sa_ai_enabled'            => '0',
+        'hr_sa_ai_api_key'            => '',
+        'hr_sa_ai_model'              => 'gpt-4o-mini',
+        'hr_sa_ai_temperature'        => '0.7',
+        'hr_sa_ai_max_tokens'         => '256',
+        'hr_sa_ai_global_instructions'=> '',
     ];
 }
 
@@ -83,88 +52,22 @@ add_action('admin_init', 'hr_sa_register_settings');
  */
 function hr_sa_register_settings(): void
 {
-    register_setting('hr_sa_settings', 'hr_sa_fallback_image', [
-        'type'              => 'string',
-        'sanitize_callback' => 'hr_sa_sanitize_https_url',
-        'default'           => hr_sa_get_settings_defaults()['hr_sa_fallback_image'],
-    ]);
-
-    register_setting('hr_sa_settings', 'hr_sa_tpl_trip', [
-        'type'              => 'string',
-        'sanitize_callback' => 'hr_sa_sanitize_template_string',
-        'default'           => hr_sa_get_settings_defaults()['hr_sa_tpl_trip'],
-    ]);
-
-    register_setting('hr_sa_settings', 'hr_sa_tpl_page', [
-        'type'              => 'string',
-        'sanitize_callback' => 'hr_sa_sanitize_template_string',
-        'default'           => hr_sa_get_settings_defaults()['hr_sa_tpl_page'],
-    ]);
-
-    register_setting('hr_sa_settings', 'hr_sa_tpl_page_brand_suffix', [
+    register_setting('hr_sa_settings', 'hr_sa_hrdf_only_mode', [
         'type'              => 'boolean',
         'sanitize_callback' => 'hr_sa_sanitize_checkbox',
-        'default'           => hr_sa_get_settings_defaults()['hr_sa_tpl_page_brand_suffix'],
-    ]);
-
-    register_setting('hr_sa_settings', 'hr_sa_locale', [
-        'type'              => 'string',
-        'sanitize_callback' => 'hr_sa_sanitize_locale',
-        'default'           => hr_sa_get_settings_defaults()['hr_sa_locale'],
-    ]);
-
-    register_setting('hr_sa_settings', 'hr_sa_site_name', [
-        'type'              => 'string',
-        'sanitize_callback' => 'hr_sa_sanitize_text',
-        'default'           => hr_sa_get_settings_defaults()['hr_sa_site_name'],
-    ]);
-
-    register_setting('hr_sa_settings', 'hr_sa_twitter_handle', [
-        'type'              => 'string',
-        'sanitize_callback' => 'hr_sa_sanitize_twitter_handle',
-        'default'           => hr_sa_get_settings_defaults()['hr_sa_twitter_handle'],
-    ]);
-
-    register_setting('hr_sa_settings', 'hr_sa_image_url_replace_enabled', [
-        'type'              => 'boolean',
-        'sanitize_callback' => 'hr_sa_sanitize_checkbox',
-        'default'           => hr_sa_get_settings_defaults()['hr_sa_image_url_replace_enabled'],
-    ]);
-
-    register_setting('hr_sa_settings', 'hr_sa_image_url_prefix_find', [
-        'type'              => 'string',
-        'sanitize_callback' => 'hr_sa_sanitize_text',
-        'default'           => hr_sa_get_settings_defaults()['hr_sa_image_url_prefix_find'],
-    ]);
-
-    register_setting('hr_sa_settings', 'hr_sa_image_url_prefix_replace', [
-        'type'              => 'string',
-        'sanitize_callback' => 'hr_sa_sanitize_text',
-        'default'           => hr_sa_get_settings_defaults()['hr_sa_image_url_prefix_replace'],
-    ]);
-
-    register_setting('hr_sa_settings', 'hr_sa_image_url_suffix_find', [
-        'type'              => 'string',
-        'sanitize_callback' => 'hr_sa_sanitize_text',
-        'default'           => hr_sa_get_settings_defaults()['hr_sa_image_url_suffix_find'],
-    ]);
-
-    register_setting('hr_sa_settings', 'hr_sa_image_url_suffix_replace', [
-        'type'              => 'string',
-        'sanitize_callback' => 'hr_sa_sanitize_text',
-        'default'           => hr_sa_get_settings_defaults()['hr_sa_image_url_suffix_replace'],
+        'default'           => hr_sa_get_settings_defaults()['hr_sa_hrdf_only_mode'],
     ]);
 
     register_setting('hr_sa_settings', 'hr_sa_og_enabled', [
         'type'              => 'boolean',
         'sanitize_callback' => 'hr_sa_sanitize_checkbox',
-        'default'           => '0',
+        'default'           => hr_sa_get_settings_defaults()['hr_sa_og_enabled'],
     ]);
 
     register_setting('hr_sa_settings', 'hr_sa_twitter_enabled', [
         'type'              => 'boolean',
         'sanitize_callback' => 'hr_sa_sanitize_checkbox',
-        'default'           => '0',
+        'default'           => hr_sa_get_settings_defaults()['hr_sa_twitter_enabled'],
     ]);
 
     register_setting('hr_sa_settings', 'hr_sa_ai_enabled', [
@@ -217,91 +120,11 @@ function hr_sa_register_settings(): void
 }
 
 /**
- * Generic text sanitization that trims and strips tags.
- */
-function hr_sa_sanitize_text($value): string
-{
-    $value = is_string($value) ? $value : '';
-    return sanitize_text_field($value);
-}
-
-/**
- * Ensure template strings are stored without tags and extraneous whitespace.
- */
-function hr_sa_sanitize_template_string($value): string
-{
-    $value = hr_sa_sanitize_text($value);
-    return $value === '' ? '' : preg_replace('/\s+/u', ' ', $value);
-}
-
-/**
  * Sanitize checkbox input to the string values '1' or '0'.
  */
 function hr_sa_sanitize_checkbox($value): string
 {
     return !empty($value) && $value !== '0' ? '1' : '0';
-}
-
-/**
- * Ensure stored URL is an absolute HTTPS link.
- */
-function hr_sa_sanitize_https_url($value): string
-{
-    $value = is_string($value) ? trim($value) : '';
-    if ($value === '') {
-        return '';
-    }
-
-    $url = esc_url_raw($value);
-    if (!$url) {
-        add_settings_error('hr_sa_settings', 'hr_sa_invalid_url', __('Fallback image must be a valid URL.', HR_SA_TEXT_DOMAIN));
-        return '';
-    }
-
-    $parts = wp_parse_url($url);
-    if (!$parts || empty($parts['scheme']) || empty($parts['host']) || strtolower((string) $parts['scheme']) !== 'https') {
-        add_settings_error('hr_sa_settings', 'hr_sa_invalid_scheme', __('Fallback image must use HTTPS.', HR_SA_TEXT_DOMAIN));
-        return '';
-    }
-
-    return $url;
-}
-
-/**
- * Validate locale strings in xx_XX format.
- */
-function hr_sa_sanitize_locale($value): string
-{
-    $value = is_string($value) ? trim($value) : '';
-    if ($value === '') {
-        return 'en_US';
-    }
-
-    if (!preg_match('/^[a-z]{2}_[A-Z]{2}$/', $value)) {
-        add_settings_error('hr_sa_settings', 'hr_sa_invalid_locale', __('Locale must match the pattern xx_XX.', HR_SA_TEXT_DOMAIN));
-        return 'en_US';
-    }
-
-    return $value;
-}
-
-/**
- * Normalize Twitter handles to always include @.
- */
-function hr_sa_sanitize_twitter_handle($value): string
-{
-    $value = is_string($value) ? trim($value) : '';
-    if ($value === '') {
-        return '';
-    }
-
-    if ($value[0] !== '@') {
-        $value = '@' . ltrim($value, '@');
-    }
-
-    $value = preg_replace('/[^A-Za-z0-9_@]/', '', $value);
-
-    return $value ?: '';
 }
 
 /**
@@ -341,7 +164,7 @@ function hr_sa_sanitize_ai_model($value): string
  */
 function hr_sa_sanitize_ai_temperature($value): string
 {
-    $raw = is_string($value) ? str_replace(',', '.', $value) : $value;
+    $raw    = is_string($value) ? str_replace(',', '.', $value) : $value;
     $number = is_numeric($raw) ? (float) $raw : (float) hr_sa_get_settings_defaults()['hr_sa_ai_temperature'];
 
     $number = max(0.0, min(2.0, $number));
@@ -391,7 +214,7 @@ function hr_sa_sanitize_conflict_mode($value): string
     }
 
     $allowed = ['respect', 'force', 'block_og'];
-    $mode = in_array($mode, $allowed, true) ? $mode : 'respect';
+    $mode    = in_array($mode, $allowed, true) ? $mode : 'respect';
 
     update_option('hr_sa_respect_other_seo', $mode === 'respect' ? '1' : '0');
 
@@ -409,10 +232,10 @@ function hr_sa_sanitize_conflict_mode($value): string
 function hr_sa_get_setting(string $option, $default = null)
 {
     $defaults = hr_sa_get_settings_defaults();
-    $default = $default ?? ($defaults[$option] ?? '');
-    $value = get_option($option, $default);
+    $default  = $default ?? ($defaults[$option] ?? '');
+    $value    = get_option($option, $default);
 
-    if (in_array($option, ['hr_sa_tpl_page_brand_suffix', 'hr_sa_debug_enabled', 'hr_sa_og_enabled', 'hr_sa_twitter_enabled', 'hr_sa_image_url_replace_enabled', 'hr_sa_ai_enabled'], true)) {
+    if (in_array($option, ['hr_sa_hrdf_only_mode', 'hr_sa_debug_enabled', 'hr_sa_og_enabled', 'hr_sa_twitter_enabled', 'hr_sa_ai_enabled'], true)) {
         return $value === '1' || $value === 1 || $value === true;
     }
 
@@ -479,19 +302,18 @@ function hr_sa_get_all_settings(): array
         $settings[$key] = get_option($key, $default);
     }
 
-    $settings['hr_sa_tpl_page_brand_suffix'] = hr_sa_get_setting('hr_sa_tpl_page_brand_suffix');
-    $settings['hr_sa_debug_enabled'] = hr_sa_get_setting('hr_sa_debug_enabled');
-    $settings['hr_sa_og_enabled'] = hr_sa_is_flag_enabled('hr_sa_og_enabled');
+    $settings['hr_sa_og_enabled']      = hr_sa_is_flag_enabled('hr_sa_og_enabled');
     $settings['hr_sa_twitter_enabled'] = hr_sa_is_flag_enabled('hr_sa_twitter_enabled');
-    $settings['hr_sa_image_url_replace_enabled'] = hr_sa_get_setting('hr_sa_image_url_replace_enabled');
+    $settings['hr_sa_debug_enabled']   = hr_sa_get_setting('hr_sa_debug_enabled');
+    $settings['hr_sa_hrdf_only_mode']  = hr_sa_get_setting('hr_sa_hrdf_only_mode');
 
     $ai_settings = hr_sa_get_ai_settings();
-    $settings['hr_sa_ai_enabled'] = $ai_settings['hr_sa_ai_enabled'];
-    $settings['hr_sa_ai_model'] = $ai_settings['hr_sa_ai_model'];
-    $settings['hr_sa_ai_temperature'] = $ai_settings['hr_sa_ai_temperature'];
-    $settings['hr_sa_ai_max_tokens'] = $ai_settings['hr_sa_ai_max_tokens'];
-    $settings['hr_sa_ai_api_key'] = hr_sa_mask_api_key_for_display($ai_settings['hr_sa_ai_api_key']);
-    $settings['hr_sa_ai_global_instructions'] = $ai_settings['hr_sa_ai_global_instructions'];
+    $settings['hr_sa_ai_enabled']              = $ai_settings['hr_sa_ai_enabled'];
+    $settings['hr_sa_ai_model']                = $ai_settings['hr_sa_ai_model'];
+    $settings['hr_sa_ai_temperature']          = $ai_settings['hr_sa_ai_temperature'];
+    $settings['hr_sa_ai_max_tokens']           = $ai_settings['hr_sa_ai_max_tokens'];
+    $settings['hr_sa_ai_api_key']              = hr_sa_mask_api_key_for_display($ai_settings['hr_sa_ai_api_key']);
+    $settings['hr_sa_ai_global_instructions']  = $ai_settings['hr_sa_ai_global_instructions'];
 
     return $settings;
 }

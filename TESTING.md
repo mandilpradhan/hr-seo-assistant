@@ -8,6 +8,18 @@ Version: 0.1.0
 
 ---
 
+## 🚨 Update — HRDF-only Mode
+
+The plugin now resolves metadata directly from **HRDF** with minimal WordPress fallbacks. Treat any legacy references below to stored fallback images, template strings, or site-name/Twitter options as historical context only. When testing, confirm that:
+
+- HRDF keys drive JSON-LD, Open Graph, and Twitter outputs.
+- The Settings page exposes the HRDF-only toggle (default on), social metadata toggles, conflict mode radios, debug toggle, and AI controls.
+- The CLI command `wp hr-seo test-doc <post_id>` mirrors HRDF data accurately.
+
+Use the remaining checklist as a baseline and adapt expectations to the HRDF-first behavior.
+
+---
+
 ## 0) Pre-checks
 - ✅ Plugin “HR SEO Assistant” is **Activated**.
 - ✅ Legacy schema MUs still active in `/wp-content/mu-plugins/` (reference).
@@ -19,17 +31,13 @@ Version: 0.1.0
 
 ## 1) Settings sanity
 1. Go to **HR SEO → Settings**.
-2. Fill these (any sensible values for now):
-   - **Fallback Image (sitewide):** pick a real URL via Media Picker.
-   - **Title templates:**
-     - Trips: `{{trip_name}} | Motorcycle Tour in {{country}}`
-     - Pages: `{{page_title}}` (leave “Append brand suffix” OFF for Phase 0)
-   - **Locale:** `en_US`
-   - **Site name:** `Himalayan Rides`
-   - **Twitter handle:** `@himalayanrides` (optional)
-   - **Image preset:** `w=1200,fit=cover,gravity=auto,format=auto,quality=75`
-   - **Conflict mode:** **Respect**
-   - **Debug mode:** **ON**
+2. Review and adjust the core toggles:
+   - ✅ **Use HRDF-only mode (no legacy data sources)** → ensure enabled (`hr_sa_hrdf_only_mode = 1`).
+   - ✅ **Enable Open Graph tags** → toggle on if you plan to verify OG output; leave off to confirm suppression.
+   - ✅ **Enable Twitter Card tags** → toggle on/off to match OG testing scenarios.
+   - ✅ **Enable AI assistance for administrators** → optional; confirm API key, model, temperature, max tokens, and global instructions fields are present.
+   - ✅ **Conflict mode** → set to **Respect** (mirrors `hr_sa_conflict_mode`).
+   - ✅ **Debug mode** → enable to expose the Debug page.
 3. Save. You should see a success notice.
 
 ---
@@ -37,11 +45,11 @@ Version: 0.1.0
 ## 2) Debug page (should appear because Debug = ON)
 Navigate: **HR SEO → Debug**  
 Verify:
-- **Environment:** Post ID / Type / Template, Current URL, Conflict Mode, Flags (jsonld/og/debug).
-- **Context:** shows at least `url, type, site_name, locale, twitter_handle, hero_url (may be null)`.
+- **Environment:** Post ID / Type / Template, Current URL, Conflict Mode, Flags (jsonld/og/twitter/debug/ai).
+- **Context:** HRDF-derived `title`, `description`, `url`, `canonical`, `site_name`, `site_url`, `hero_url`, `images[]`, `type`, `og_type`, `hrdf_available`, `is_trip`.
 - **Connectors:** “Hero filter” present? (OK if **No** for now.)
 - **Settings snapshot:** values you saved above.
-- **Modules:** JSON-LD (enabled), OG (disabled).
+- **Modules:** JSON-LD (enabled), OG/Twitter reflect current toggles.
 - **No errors/warnings**.
 
 ---
