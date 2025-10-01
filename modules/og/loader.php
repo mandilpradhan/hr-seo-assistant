@@ -243,7 +243,7 @@ function hr_sa_prepare_og_tags(array $context): array
     $description = trim((string) ($context['description'] ?? ''));
     $url         = trim((string) ($context['url'] ?? ''));
     $site_name   = trim((string) ($context['site_name'] ?? ''));
-    $type        = trim((string) ($context['og_type'] ?? hr_sa_map_og_type((string) ($context['type'] ?? ''))));
+    $type        = hr_sa_sanitize_text_value((string) ($context['og_type'] ?? ''));
     $images      = $context['images'] ?? [];
 
     if (!is_array($images)) {
@@ -253,21 +253,36 @@ function hr_sa_prepare_og_tags(array $context): array
     $images = array_values(array_filter(array_map('trim', $images), static fn(string $value): bool => $value !== ''));
     $images = array_slice($images, 0, 4);
 
-    $locale = get_locale();
-
     $tags = [
         'og:title'       => $title,
         'og:description' => $description,
-        'og:type'        => $type !== '' ? $type : hr_sa_map_og_type((string) ($context['type'] ?? '')),
         'og:url'         => $url,
         'og:site_name'   => $site_name,
-        'og:locale'      => $locale,
     ];
+
+    if ($type !== '') {
+        $tags['og:type'] = $type;
+    }
 
     $tags = array_filter($tags, static fn($value): bool => is_string($value) && $value !== '');
 
     if ($images) {
         $tags['og:image'] = $images;
+    }
+
+    if (isset($tags['og:type']) && strtolower($tags['og:type']) === 'product') {
+        $offer = hr_sa_select_primary_offer($context['offers'] ?? []);
+        if ($offer) {
+            if (!empty($offer['price'])) {
+                $tags['product:price:amount'] = (string) $offer['price'];
+            }
+            if (!empty($offer['priceCurrency'])) {
+                $tags['product:price:currency'] = (string) $offer['priceCurrency'];
+            }
+            if (!empty($offer['availability'])) {
+                $tags['product:availability'] = (string) $offer['availability'];
+            }
+        }
     }
 
     /**
@@ -277,6 +292,33 @@ function hr_sa_prepare_og_tags(array $context): array
      * @param array<string, mixed> $context
      */
     return apply_filters('hr_sa_og_tags', $tags, $context);
+}
+
+/**
+ * Select the primary offer to drive product OG tags.
+ *
+ * @param mixed $offers
+ * @return array<string, mixed>|null
+ */
+function hr_sa_select_primary_offer($offers): ?array
+{
+    if (!is_array($offers)) {
+        return null;
+    }
+
+    foreach ($offers as $offer) {
+        if (!is_array($offer)) {
+            continue;
+        }
+
+        if (!empty($offer['price']) || !empty($offer['priceCurrency']) || !empty($offer['availability'])) {
+            return $offer;
+        }
+    }
+
+    $first = reset($offers);
+
+    return is_array($first) ? $first : null;
 }
 
 /**
@@ -299,16 +341,27 @@ function hr_sa_prepare_twitter_tags(array $context): array
     $images = array_values(array_filter(array_map('trim', $images), static fn(string $value): bool => $value !== ''));
     $image  = $images[0] ?? '';
 
-    $card = $image !== '' ? 'summary_large_image' : 'summary';
+    $card = hr_sa_sanitize_text_value((string) ($context['twitter_card'] ?? ''));
 
     $tags = [
-        'twitter:card'        => $card,
         'twitter:title'       => $title,
         'twitter:description' => $description,
     ];
 
+    if ($card !== '') {
+        $tags['twitter:card'] = $card;
+    }
+
     if ($image !== '') {
         $tags['twitter:image'] = $image;
+    }
+
+    if (!empty($context['twitter_site'])) {
+        $tags['twitter:site'] = (string) $context['twitter_site'];
+    }
+
+    if (!empty($context['twitter_creator'])) {
+        $tags['twitter:creator'] = (string) $context['twitter_creator'];
     }
 
     $tags = array_filter($tags, static fn($value): bool => is_string($value) && $value !== '');
@@ -319,28 +372,7 @@ function hr_sa_prepare_twitter_tags(array $context): array
      * @param array<string, string> $tags
      * @param array<string, mixed>  $context
      */
-    $tags = apply_filters('hr_sa_twitter_tags', $tags, $context);
-
-    if (!isset($tags['twitter:card'])) {
-        $tags['twitter:card'] = $card;
-    }
-
-    return $tags;
-}
-
-/**
- * Map internal content types to Open Graph types.
- */
-function hr_sa_map_og_type(string $content_type): string
-{
-    switch ($content_type) {
-        case 'home':
-            return 'website';
-        case 'trip':
-            return 'product';
-        default:
-            return 'article';
-    }
+    return apply_filters('hr_sa_twitter_tags', $tags, $context);
 }
 
 /**

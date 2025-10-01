@@ -43,6 +43,30 @@ function hr_sa_get_context(): array
         'is_trip'        => ($type === 'trip'),
     ];
 
+    $twitter_card = hr_sa_hrdf_get_first(['hrdf.twitter.card'], $post_id, '');
+    if (is_string($twitter_card)) {
+        $card = hr_sa_sanitize_text_value($twitter_card);
+        if ($card !== '') {
+            $context['twitter_card'] = $card;
+        }
+    }
+
+    $twitter_site = hr_sa_hrdf_get_first(['hrdf.twitter.site'], $post_id, '');
+    if (is_string($twitter_site)) {
+        $site_handle = hr_sa_sanitize_text_value($twitter_site);
+        if ($site_handle !== '') {
+            $context['twitter_site'] = $site_handle;
+        }
+    }
+
+    $twitter_creator = hr_sa_hrdf_get_first(['hrdf.twitter.creator'], $post_id, '');
+    if (is_string($twitter_creator)) {
+        $creator_handle = hr_sa_sanitize_text_value($twitter_creator);
+        if ($creator_handle !== '') {
+            $context['twitter_creator'] = $creator_handle;
+        }
+    }
+
     /**
      * Filter the HRDF-derived SEO context array.
      *
@@ -78,19 +102,7 @@ function hr_sa_resolve_content_type(int $post_id): string
 function hr_sa_resolve_og_type(string $content_type, string $hrdf_type): string
 {
     $normalized = hr_sa_sanitize_text_value($hrdf_type);
-    if ($normalized !== '') {
-        return $normalized;
-    }
-
-    if ($content_type === 'trip') {
-        return 'product';
-    }
-
-    if ($content_type === 'home') {
-        return 'website';
-    }
-
-    return 'article';
+    return $normalized;
 }
 
 /**
@@ -100,26 +112,29 @@ function hr_sa_resolve_og_type(string $content_type, string $hrdf_type): string
  */
 function hr_sa_resolve_site_profile(): array
 {
-    $site_name = hr_sa_sanitize_text_value((string) hr_sa_hrdf_get('hrdf.site.name', 0, ''));
-    if ($site_name === '') {
-        $site_name = hr_sa_sanitize_text_value((string) get_bloginfo('name'));
-    }
+    $name_raw = hr_sa_hrdf_get_first([
+        'hrdf.org.name',
+        'hrdf.site.name',
+    ], 0, '');
+    $site_name = is_string($name_raw) ? hr_sa_sanitize_text_value($name_raw) : '';
 
-    $site_url = hr_sa_normalize_url((string) hr_sa_hrdf_get('hrdf.site.url', 0, ''));
-    if ($site_url === null) {
-        $site_url = trailingslashit((string) home_url('/'));
-    }
+    $url_raw = hr_sa_hrdf_get_first([
+        'hrdf.org.url',
+        'hrdf.site.url',
+    ], 0, '');
+    $site_url = is_string($url_raw) ? hr_sa_normalize_url($url_raw) : null;
 
-    $logo = hr_sa_normalize_url((string) hr_sa_hrdf_get('hrdf.site.logo_url', 0, ''));
-    if ($logo === null) {
-        $logo = hr_sa_normalize_url((string) get_site_icon_url());
-    }
+    $logo_raw = hr_sa_hrdf_get_first([
+        'hrdf.org.logo.url',
+        'hrdf.site.logo_url',
+    ], 0, '');
+    $logo = is_string($logo_raw) ? hr_sa_normalize_url($logo_raw) : null;
 
-    return [
+    return array_filter([
         'name' => $site_name,
         'url'  => $site_url,
         'logo' => $logo,
-    ];
+    ], static fn($value) => $value !== null && $value !== '');
 }
 
 /**
@@ -129,37 +144,39 @@ function hr_sa_resolve_site_profile(): array
  */
 function hr_sa_resolve_meta_profile(int $post_id): array
 {
-    $title = hr_sa_sanitize_text_value((string) hr_sa_hrdf_get('hrdf.meta.title', $post_id, ''));
-    if ($title === '' && $post_id > 0) {
-        $title = hr_sa_sanitize_text_value((string) get_the_title($post_id));
-    }
+    $title_raw = hr_sa_hrdf_get_first([
+        'hrdf.webpage.title',
+        'hrdf.meta.title',
+        'hrdf.trip.title',
+    ], $post_id, '');
+    $title = is_string($title_raw) ? hr_sa_sanitize_text_value($title_raw) : '';
 
-    $description = hr_sa_sanitize_description((string) hr_sa_hrdf_get('hrdf.meta.description', $post_id, ''));
-    if ($description === '' && $post_id > 0) {
-        $fallback_excerpt = get_the_excerpt($post_id);
-        if (is_string($fallback_excerpt)) {
-            $description = hr_sa_sanitize_description($fallback_excerpt);
-        }
-    }
+    $description_raw = hr_sa_hrdf_get_first([
+        'hrdf.webpage.description',
+        'hrdf.meta.description',
+        'hrdf.trip.description',
+    ], $post_id, '');
+    $description = is_string($description_raw) ? hr_sa_sanitize_description($description_raw) : '';
 
-    $canonical = hr_sa_normalize_url((string) hr_sa_hrdf_get('hrdf.meta.canonical_url', $post_id, ''));
-    if ($canonical === null && $post_id > 0) {
-        $fallback_url = get_permalink($post_id);
-        $canonical    = $fallback_url ? hr_sa_normalize_url((string) $fallback_url) : null;
-    }
+    $canonical_raw = hr_sa_hrdf_get_first([
+        'hrdf.webpage.url',
+        'hrdf.meta.canonical_url',
+        'hrdf.trip.url',
+    ], $post_id, '');
+    $canonical = is_string($canonical_raw) ? hr_sa_normalize_url($canonical_raw) : null;
 
-    if ($canonical === null) {
-        $canonical = trailingslashit((string) home_url('/'));
-    }
+    $og_type_raw = hr_sa_hrdf_get_first([
+        'hrdf.meta.og_type',
+        'hrdf.webpage.og_type',
+    ], $post_id, '');
+    $og_type = is_string($og_type_raw) ? hr_sa_sanitize_text_value($og_type_raw) : '';
 
-    $meta = [
-        'title'          => $title,
-        'description'    => $description,
-        'canonical_url'  => $canonical,
-        'og_type'        => hr_sa_sanitize_text_value((string) hr_sa_hrdf_get('hrdf.meta.og_type', $post_id, '')),
+    return [
+        'title'         => $title,
+        'description'   => $description,
+        'canonical_url' => $canonical ?? '',
+        'og_type'       => $og_type,
     ];
-
-    return $meta;
 }
 
 /**
@@ -169,35 +186,44 @@ function hr_sa_resolve_meta_profile(int $post_id): array
  */
 function hr_sa_resolve_image_profile(int $post_id): array
 {
-    $primary = hr_sa_normalize_url((string) hr_sa_hrdf_get('hrdf.hero.image_url', $post_id, ''));
+    $primary = null;
+    $primary_candidates = [
+        hr_sa_hrdf_get('hrdf.webpage.image', $post_id, ''),
+        hr_sa_hrdf_get('hrdf.trip.primary_image', $post_id, ''),
+        hr_sa_hrdf_get('hrdf.hero.image_url', $post_id, ''),
+    ];
 
-    $gallery = hr_sa_collect_image_urls((array) hr_sa_hrdf_get('hrdf.gallery.images', $post_id, []));
-    $trip_gallery = hr_sa_collect_image_urls((array) hr_sa_hrdf_get('hrdf.trip.gallery.images', $post_id, []));
+    foreach ($primary_candidates as $candidate) {
+        if (!is_string($candidate) || $candidate === '') {
+            continue;
+        }
 
-    $images = [];
-    if ($primary !== null) {
-        $images[] = $primary;
+        $normalized = hr_sa_normalize_url($candidate);
+        if ($normalized !== null) {
+            $primary = $normalized;
+            break;
+        }
     }
 
-    foreach (array_merge($gallery, $trip_gallery) as $url) {
-        if (!in_array($url, $images, true)) {
-            $images[] = $url;
+    $collections = [
+        (array) hr_sa_hrdf_get('hrdf.webpage.images', $post_id, []),
+        (array) hr_sa_hrdf_get('hrdf.trip.images', $post_id, []),
+        (array) hr_sa_hrdf_get('hrdf.gallery.images', $post_id, []),
+        (array) hr_sa_hrdf_get('hrdf.trip.gallery.images', $post_id, []),
+    ];
+
+    $images = [];
+    foreach ($collections as $collection) {
+        $normalized_collection = hr_sa_collect_image_urls($collection);
+        foreach ($normalized_collection as $url) {
+            if (!in_array($url, $images, true)) {
+                $images[] = $url;
+            }
         }
     }
 
     if ($primary === null && !empty($images)) {
         $primary = $images[0];
-    }
-
-    if ($primary === null && $post_id > 0) {
-        $fallback = get_the_post_thumbnail_url($post_id, 'full');
-        $normalized = $fallback ? hr_sa_normalize_url((string) $fallback) : null;
-        if ($normalized !== null) {
-            $primary = $normalized;
-            if (!in_array($normalized, $images, true)) {
-                $images[] = $normalized;
-            }
-        }
     }
 
     return [

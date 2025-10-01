@@ -13,6 +13,8 @@ if (!defined('ABSPATH')) {
 
 hr_sa_jsonld_register_emitter('trip', 'hr_sa_trip_emit_nodes');
 
+add_filter('hr_sa_get_context', 'hr_sa_trip_enrich_context', 10, 2);
+
 /**
  * Emit nodes for trip views.
  *
@@ -29,36 +31,72 @@ function hr_sa_trip_emit_nodes(int $post_id = 0): array
         return [];
     }
 
-    $site_profile  = hr_sa_resolve_site_profile();
-    $meta_profile  = hr_sa_resolve_meta_profile($trip_id);
-    $image_profile = hr_sa_resolve_image_profile($trip_id);
     $document      = hr_sa_hrdf_document($trip_id);
+    $image_profile = hr_sa_resolve_image_profile($trip_id);
+    $site_profile  = hr_sa_resolve_site_profile();
 
-    $site_url = $site_profile['url'] ?? trailingslashit((string) home_url('/'));
-    $org_id   = rtrim($site_url, '/') . '#org';
+    $trip_url_raw = hr_sa_hrdf_get_first([
+        'hrdf.trip.url',
+        'hrdf.webpage.url',
+        'hrdf.meta.canonical_url',
+    ], $trip_id, '');
+    $trip_url = is_string($trip_url_raw) ? hr_sa_normalize_url($trip_url_raw) : null;
+    if ($trip_url === null) {
+        return [];
+    }
 
-    $canonical   = $meta_profile['canonical_url'] ?? (get_permalink($trip_id) ?: $site_url);
-    $trip_node   = hr_sa_trip_build_product_node($trip_id, $canonical, $meta_profile, $image_profile, $document, $org_id);
-    if (!$trip_node) {
+    $title_raw = hr_sa_hrdf_get_first([
+        'hrdf.trip.title',
+        'hrdf.webpage.title',
+        'hrdf.meta.title',
+    ], $trip_id, '');
+    $title = is_string($title_raw) ? hr_sa_sanitize_text_value($title_raw) : '';
+    if ($title === '') {
+        return [];
+    }
+
+    $description_raw = hr_sa_hrdf_get_first([
+        'hrdf.trip.description',
+        'hrdf.webpage.description',
+        'hrdf.meta.description',
+    ], $trip_id, '');
+    $description = is_string($description_raw) ? hr_sa_sanitize_description($description_raw) : '';
+
+    $org_url = isset($site_profile['url']) && is_string($site_profile['url'])
+        ? (string) $site_profile['url']
+        : '';
+    $org_id = $org_url !== '' ? rtrim($org_url, '/') . '#org' : '';
+
+    $trip_node = hr_sa_trip_build_product_node(
+        $trip_id,
+        $trip_url,
+        $title,
+        $description,
+        $image_profile,
+        $document,
+        $org_id
+    );
+
+    if ($trip_node === null) {
         return [];
     }
 
     $graph    = [$trip_node];
     $has_part = [];
 
-    $itinerary_nodes = hr_sa_trip_build_itinerary_nodes($canonical, $document, $trip_id);
+    $itinerary_nodes = hr_sa_trip_build_itinerary_nodes($trip_url, $document, $trip_id);
     if ($itinerary_nodes) {
-        $graph[]   = $itinerary_nodes['node'];
+        $graph[]    = $itinerary_nodes['node'];
         $has_part[] = ['@id' => $itinerary_nodes['node']['@id']];
     }
 
-    $faq_nodes = hr_sa_trip_build_faq_nodes($canonical, $document, $trip_id);
+    $faq_nodes = hr_sa_trip_build_faq_nodes($trip_url, $document, $trip_id);
     if ($faq_nodes) {
-        $graph[]   = $faq_nodes['node'];
+        $graph[]    = $faq_nodes['node'];
         $has_part[] = ['@id' => $faq_nodes['node']['@id']];
     }
 
-    $review_nodes = hr_sa_trip_build_review_nodes($canonical, $document, $trip_id);
+    $review_nodes = hr_sa_trip_build_review_nodes($trip_url, $document, $trip_id);
     if ($review_nodes) {
         foreach ($review_nodes['reviews'] ?? [] as $review_node) {
             $graph[] = $review_node;
@@ -71,10 +109,10 @@ function hr_sa_trip_emit_nodes(int $post_id = 0): array
         }
     }
 
-    $bike_nodes = hr_sa_trip_build_bike_nodes($canonical, $document, $org_id, $trip_id);
+    $bike_nodes = hr_sa_trip_build_bike_nodes($trip_url, $document, $org_id, $trip_id);
     if ($bike_nodes) {
         foreach ($bike_nodes['vehicles'] as $vehicle_node) {
-            $graph[] = $vehicle_node;
+            $graph[]    = $vehicle_node;
             $has_part[] = ['@id' => $vehicle_node['@id']];
         }
         if ($bike_nodes['offers']) {
@@ -86,16 +124,16 @@ function hr_sa_trip_emit_nodes(int $post_id = 0): array
         }
     }
 
-    $stopover_node = hr_sa_trip_build_stopovers_node($canonical, $document, $trip_id);
+    $stopover_node = hr_sa_trip_build_stopovers_node($trip_url, $document, $trip_id);
     if ($stopover_node) {
-        $graph[]   = $stopover_node;
+        $graph[]    = $stopover_node;
         $has_part[] = ['@id' => $stopover_node['@id']];
     }
 
-    $guide_nodes = hr_sa_trip_build_guide_nodes($canonical, $document, $trip_id);
+    $guide_nodes = hr_sa_trip_build_guide_nodes($trip_url, $document, $trip_id);
     if ($guide_nodes) {
         foreach ($guide_nodes as $guide_node) {
-            $graph[] = $guide_node;
+            $graph[]    = $guide_node;
             $has_part[] = ['@id' => $guide_node['@id']];
         }
     }
@@ -116,25 +154,32 @@ function hr_sa_trip_emit_nodes(int $post_id = 0): array
  */
 function hr_sa_trip_build_product_node(
     int $post_id,
-    string $canonical,
-    array $meta_profile,
+    string $trip_url,
+    string $title,
+    string $description,
     array $image_profile,
     array $document,
     string $org_id
 ): ?array {
-    $title       = $meta_profile['title'] ?? '';
-    $description = $meta_profile['description'] ?? '';
-    $images      = array_slice(array_filter($image_profile['all'] ?? []), 0, 8);
+    if ($trip_url === '' || $title === '') {
+        return null;
+    }
+
+    $images = array_filter($image_profile['all'] ?? [], 'is_string');
+    $images = array_slice(array_values($images), 0, 8);
 
     $trip_node = [
         '@type' => ['Product', 'TouristTrip'],
-        '@id'   => rtrim($canonical, '/') . '#trip',
-        'url'   => $canonical,
+        '@id'   => rtrim($trip_url, '/') . '#trip',
+        'url'   => $trip_url,
         'name'  => $title,
-        'brand' => [
-            '@id' => $org_id,
-        ],
     ];
+
+    if ($org_id !== '') {
+        $trip_node['brand'] = [
+            '@id' => $org_id,
+        ];
+    }
 
     if ($description !== '') {
         $trip_node['description'] = $description;
@@ -144,9 +189,14 @@ function hr_sa_trip_build_product_node(
         $trip_node['image'] = $images;
     }
 
-    $primary_offer = hr_sa_trip_prepare_primary_offer($document, $post_id);
-    if ($primary_offer) {
-        $trip_node['offers'] = [$primary_offer];
+    $offers = hr_sa_trip_collect_offers($document, $post_id);
+    if ($offers) {
+        $trip_node['offers'] = $offers;
+    }
+
+    $aggregate_offer = hr_sa_trip_collect_aggregate_offer($document, $post_id);
+    if ($aggregate_offer) {
+        $trip_node['aggregateOffer'] = $aggregate_offer;
     }
 
     $properties = hr_sa_trip_prepare_property_values($document, $post_id);
@@ -158,74 +208,251 @@ function hr_sa_trip_build_product_node(
 }
 
 /**
- * Prepare the primary offer from HRDF.
+ * Collect Offer nodes from HRDF data.
  *
- * @return array<string, mixed>|null
+ * @return array<int, array<string, mixed>>
  */
-function hr_sa_trip_prepare_primary_offer(array $document, int $post_id): ?array
+function hr_sa_trip_collect_offers(array $document, int $post_id): array
 {
-    $offer = $document['offer']['primary'] ?? hr_sa_hrdf_get('hrdf.offer.primary', $post_id, []);
-    if (!is_array($offer) || !$offer) {
-        return null;
-    }
+    $offers = [];
 
-    $schema_offer = ['@type' => 'Offer'];
+    $document_offers = hr_sa_trip_document_path($document, ['trip', 'offers']);
+    if (is_array($document_offers)) {
+        foreach ($document_offers as $raw_offer) {
+            if (!is_array($raw_offer)) {
+                continue;
+            }
 
-    foreach (['price', 'priceCurrency', 'availability', 'url', 'priceValidUntil'] as $field) {
-        if (!empty($offer[$field]) && is_string($offer[$field])) {
-            $value = $field === 'url' ? hr_sa_normalize_url($offer[$field]) : $offer[$field];
-            if ($value) {
-                $schema_offer[$field] = $value;
+            $normalized = hr_sa_trip_normalize_offer($raw_offer);
+            if ($normalized) {
+                $offers[] = $normalized;
             }
         }
     }
 
-    if (!empty($offer['price']) && is_numeric($offer['price'])) {
-        $schema_offer['price'] = (string) $offer['price'];
+    $hrdf_offers = hr_sa_hrdf_get_first([
+        'hrdf.trip.offers',
+    ], $post_id, []);
+    if (is_array($hrdf_offers)) {
+        foreach ($hrdf_offers as $raw_offer) {
+            if (!is_array($raw_offer)) {
+                continue;
+            }
+
+            $normalized = hr_sa_trip_normalize_offer($raw_offer);
+            if ($normalized) {
+                $offers[] = $normalized;
+            }
+        }
     }
 
-    if (!empty($offer['availabilityStarts']) && is_string($offer['availabilityStarts'])) {
-        $schema_offer['availabilityStarts'] = $offer['availabilityStarts'];
+    $primary_offer = hr_sa_hrdf_get_first([
+        'hrdf.offer.primary',
+    ], $post_id, []);
+    if (is_array($primary_offer) && $primary_offer) {
+        $normalized = hr_sa_trip_normalize_offer($primary_offer);
+        if ($normalized) {
+            $offers[] = $normalized;
+        }
     }
 
-    if (!empty($offer['availabilityEnds']) && is_string($offer['availabilityEnds'])) {
-        $schema_offer['availabilityEnds'] = $offer['availabilityEnds'];
-    }
-
-    $availability_from_dates = hr_sa_trip_extract_availability($document, $post_id);
-    $schema_offer = array_merge($availability_from_dates, $schema_offer);
-
-    return count($schema_offer) > 1 ? $schema_offer : null;
+    return array_values($offers);
 }
 
 /**
- * Extract availability timing from hrdf.trip.dates[] when possible.
- *
- * @return array<string, string>
+ * Normalize a single HRDF offer payload.
  */
-function hr_sa_trip_extract_availability(array $document, int $post_id): array
+function hr_sa_trip_normalize_offer(array $raw): ?array
 {
-    $dates = $document['trip']['dates'] ?? hr_sa_hrdf_get('hrdf.trip.dates', $post_id, []);
-    if (!is_array($dates) || !$dates) {
-        return [];
+    $offer = ['@type' => 'Offer'];
+
+    if (!empty($raw['name']) && is_string($raw['name'])) {
+        $name = hr_sa_sanitize_text_value($raw['name']);
+        if ($name !== '') {
+            $offer['name'] = $name;
+        }
     }
 
-    $first = $dates[0];
-    if (!is_array($first)) {
-        return [];
+    $price_amount = null;
+    $price_currency = null;
+
+    if (isset($raw['price']) && is_array($raw['price'])) {
+        if (isset($raw['price']['amount']) && $raw['price']['amount'] !== '') {
+            $price_amount = (string) $raw['price']['amount'];
+        }
+        if (isset($raw['price']['currency']) && $raw['price']['currency'] !== '') {
+            $price_currency = (string) $raw['price']['currency'];
+        }
+    } elseif (isset($raw['price']) && $raw['price'] !== '') {
+        $price_amount = (string) $raw['price'];
     }
 
-    $availability = [];
-    if (!empty($first['start']) && is_string($first['start'])) {
-        $availability['availabilityStarts'] = $first['start'];
-    }
-    if (!empty($first['end']) && is_string($first['end'])) {
-        $availability['availabilityEnds'] = $first['end'];
+    if (isset($raw['priceAmount']) && $raw['priceAmount'] !== '') {
+        $price_amount = (string) $raw['priceAmount'];
     }
 
-    return $availability;
+    if (isset($raw['priceCurrency']) && $raw['priceCurrency'] !== '') {
+        $price_currency = (string) $raw['priceCurrency'];
+    }
+
+    if ($price_amount !== null) {
+        $offer['price'] = $price_amount;
+    }
+
+    if ($price_currency !== null) {
+        $offer['priceCurrency'] = $price_currency;
+    }
+
+    if (!empty($raw['availability']) && is_string($raw['availability'])) {
+        $offer['availability'] = $raw['availability'];
+    }
+
+    if (!empty($raw['inventoryRemaining']) && is_numeric($raw['inventoryRemaining'])) {
+        $offer['inventoryLevel'] = [
+            '@type' => 'QuantitativeValue',
+            'value' => (int) $raw['inventoryRemaining'],
+        ];
+    } elseif (!empty($raw['inventory_remaining']) && is_numeric($raw['inventory_remaining'])) {
+        $offer['inventoryLevel'] = [
+            '@type' => 'QuantitativeValue',
+            'value' => (int) $raw['inventory_remaining'],
+        ];
+    }
+
+    if (!empty($raw['eligibleQuantity']) && is_numeric($raw['eligibleQuantity'])) {
+        $offer['eligibleQuantity'] = [
+            '@type' => 'QuantitativeValue',
+            'value' => (int) $raw['eligibleQuantity'],
+        ];
+    } elseif (!empty($raw['eligible_quantity']) && is_numeric($raw['eligible_quantity'])) {
+        $offer['eligibleQuantity'] = [
+            '@type' => 'QuantitativeValue',
+            'value' => (int) $raw['eligible_quantity'],
+        ];
+    }
+
+    if (!empty($raw['priceValidFrom']) && is_string($raw['priceValidFrom'])) {
+        $offer['priceValidFrom'] = $raw['priceValidFrom'];
+    } elseif (!empty($raw['valid_from']) && is_string($raw['valid_from'])) {
+        $offer['priceValidFrom'] = $raw['valid_from'];
+    }
+
+    if (!empty($raw['priceValidUntil']) && is_string($raw['priceValidUntil'])) {
+        $offer['priceValidUntil'] = $raw['priceValidUntil'];
+    } elseif (!empty($raw['valid_until']) && is_string($raw['valid_until'])) {
+        $offer['priceValidUntil'] = $raw['valid_until'];
+    }
+
+    if (!empty($raw['availabilityEnds']) && is_string($raw['availabilityEnds'])) {
+        $offer['availabilityEnds'] = $raw['availabilityEnds'];
+    }
+
+    if (!empty($raw['validFrom']) && is_string($raw['validFrom'])) {
+        $offer['validFrom'] = $raw['validFrom'];
+    } elseif (!empty($raw['date']) && is_string($raw['date'])) {
+        $offer['validFrom'] = $raw['date'];
+    }
+
+    if (!empty($raw['url']) && is_string($raw['url'])) {
+        $url = hr_sa_normalize_url($raw['url']);
+        if ($url) {
+            $offer['url'] = $url;
+        }
+    }
+
+    return count($offer) > 1 ? $offer : null;
 }
 
+/**
+ * Normalize AggregateOffer data from HRDF when available.
+ *
+ * @return array<string, mixed>|null
+ */
+function hr_sa_trip_collect_aggregate_offer(array $document, int $post_id): ?array
+{
+    $aggregate = hr_sa_trip_document_path($document, ['trip', 'aggregateOffer']);
+    if (!is_array($aggregate) || !$aggregate) {
+        $aggregate = hr_sa_hrdf_get_first([
+            'hrdf.trip.aggregateOffer',
+        ], $post_id, []);
+    }
+
+    if (!is_array($aggregate) || !$aggregate) {
+        return null;
+    }
+
+    $node = ['@type' => 'AggregateOffer'];
+
+    foreach ([
+        'lowPrice'      => ['lowPrice', 'low_price'],
+        'highPrice'     => ['highPrice', 'high_price'],
+        'priceCurrency' => ['priceCurrency', 'currency'],
+        'offerCount'    => ['offerCount', 'offer_count'],
+    ] as $target => $candidates) {
+        foreach ($candidates as $candidate) {
+            if (isset($aggregate[$candidate]) && $aggregate[$candidate] !== '') {
+                $node[$target] = (string) $aggregate[$candidate];
+                break;
+            }
+        }
+    }
+
+    return count($node) > 1 ? $node : null;
+}
+
+/**
+ * Safely resolve nested document paths.
+ *
+ * @param array<int|string, mixed> $document
+ * @param array<int, string>       $path
+ * @return mixed|null
+ */
+function hr_sa_trip_document_path(array $document, array $path)
+{
+    $value = $document;
+    foreach ($path as $segment) {
+        if (!is_array($value) || !array_key_exists($segment, $value)) {
+            return null;
+        }
+        $value = $value[$segment];
+    }
+
+    return $value;
+}
+
+/**
+ * Enrich the shared SEO context with trip-specific HRDF data.
+ *
+ * @param array<string, mixed> $context
+ * @param int                  $post_id
+ * @return array<string, mixed>
+ */
+function hr_sa_trip_enrich_context(array $context, int $post_id): array
+{
+    if (($context['type'] ?? '') !== 'trip') {
+        return $context;
+    }
+
+    $document = hr_sa_hrdf_document($post_id);
+
+    $offers = hr_sa_trip_collect_offers($document, $post_id);
+    if ($offers) {
+        $context['offers'] = $offers;
+    }
+
+    $aggregate_offer = hr_sa_trip_collect_aggregate_offer($document, $post_id);
+    if ($aggregate_offer) {
+        $context['aggregate_offer'] = $aggregate_offer;
+    }
+
+    return $context;
+}
+
+/**
+ * Prepare the primary offer from HRDF.
+ *
+ * @return array<string, mixed>|null
+ */
 /**
  * Prepare PropertyValue entries from hrdf.trip.properties[].
  *
@@ -233,7 +460,16 @@ function hr_sa_trip_extract_availability(array $document, int $post_id): array
  */
 function hr_sa_trip_prepare_property_values(array $document, int $post_id): array
 {
-    $properties = $document['trip']['properties'] ?? hr_sa_hrdf_get('hrdf.trip.properties', $post_id, []);
+    $properties = hr_sa_trip_document_path($document, ['trip', 'additionalProperty']);
+    if (!is_array($properties) || !$properties) {
+        $properties = hr_sa_trip_document_path($document, ['trip', 'properties']);
+    }
+    if (!is_array($properties) || !$properties) {
+        $properties = hr_sa_hrdf_get_first([
+            'hrdf.trip.additionalProperty',
+            'hrdf.trip.properties',
+        ], $post_id, []);
+    }
     if (!is_array($properties)) {
         return [];
     }
@@ -280,7 +516,16 @@ function hr_sa_trip_prepare_property_values(array $document, int $post_id): arra
  */
 function hr_sa_trip_build_itinerary_nodes(string $canonical, array $document, int $post_id): ?array
 {
-    $items = $document['itinerary']['items'] ?? hr_sa_hrdf_get('hrdf.itinerary.items', $post_id, []);
+    $items = hr_sa_trip_document_path($document, ['trip', 'itinerary', 'steps']);
+    if (!is_array($items) || !$items) {
+        $items = hr_sa_trip_document_path($document, ['itinerary', 'items']);
+    }
+    if (!is_array($items) || !$items) {
+        $items = hr_sa_hrdf_get_first([
+            'hrdf.trip.itinerary.steps',
+            'hrdf.itinerary.items',
+        ], $post_id, []);
+    }
     if (!is_array($items) || !$items) {
         return null;
     }
@@ -328,7 +573,16 @@ function hr_sa_trip_build_itinerary_nodes(string $canonical, array $document, in
         'itemListElement' => $list_items,
     ];
 
-    $itinerary_url = $document['itinerary']['url'] ?? hr_sa_hrdf_get('hrdf.itinerary.url', $post_id, '');
+    $itinerary_url = hr_sa_trip_document_path($document, ['trip', 'itinerary', 'url']);
+    if (!is_string($itinerary_url) || $itinerary_url === '') {
+        $itinerary_url = hr_sa_trip_document_path($document, ['itinerary', 'url']);
+    }
+    if (!is_string($itinerary_url) || $itinerary_url === '') {
+        $itinerary_url = hr_sa_hrdf_get_first([
+            'hrdf.trip.itinerary.url',
+            'hrdf.itinerary.url',
+        ], $post_id, '');
+    }
     if (is_string($itinerary_url)) {
         $normalized = hr_sa_normalize_url($itinerary_url);
         if ($normalized) {
@@ -346,7 +600,16 @@ function hr_sa_trip_build_itinerary_nodes(string $canonical, array $document, in
  */
 function hr_sa_trip_build_faq_nodes(string $canonical, array $document, int $post_id): ?array
 {
-    $items = $document['faq']['items'] ?? hr_sa_hrdf_get('hrdf.faq.items', $post_id, []);
+    $items = hr_sa_trip_document_path($document, ['trip', 'faq', 'items']);
+    if (!is_array($items) || !$items) {
+        $items = hr_sa_trip_document_path($document, ['faq', 'items']);
+    }
+    if (!is_array($items) || !$items) {
+        $items = hr_sa_hrdf_get_first([
+            'hrdf.trip.faq.items',
+            'hrdf.faq.items',
+        ], $post_id, []);
+    }
     if (!is_array($items) || !$items) {
         return null;
     }
@@ -396,8 +659,27 @@ function hr_sa_trip_build_faq_nodes(string $canonical, array $document, int $pos
  */
 function hr_sa_trip_build_review_nodes(string $canonical, array $document, int $post_id): ?array
 {
-    $reviews = $document['reviews'] ?? hr_sa_hrdf_get('hrdf.reviews', $post_id, []);
-    $aggregate = $document['aggregate_rating'] ?? hr_sa_hrdf_get('hrdf.aggregate_rating', $post_id, []);
+    $reviews = hr_sa_trip_document_path($document, ['trip', 'reviews']);
+    if (!is_array($reviews) || !$reviews) {
+        $reviews = hr_sa_trip_document_path($document, ['reviews']);
+    }
+    if (!is_array($reviews) || !$reviews) {
+        $reviews = hr_sa_hrdf_get_first([
+            'hrdf.trip.reviews',
+            'hrdf.reviews',
+        ], $post_id, []);
+    }
+
+    $aggregate = hr_sa_trip_document_path($document, ['trip', 'aggregateRating']);
+    if (!is_array($aggregate) || !$aggregate) {
+        $aggregate = hr_sa_trip_document_path($document, ['aggregate_rating']);
+    }
+    if (!is_array($aggregate) || !$aggregate) {
+        $aggregate = hr_sa_hrdf_get_first([
+            'hrdf.trip.aggregateRating',
+            'hrdf.aggregate_rating',
+        ], $post_id, []);
+    }
 
     $review_nodes = [];
     if (is_array($reviews)) {
@@ -483,17 +765,26 @@ function hr_sa_trip_build_review_nodes(string $canonical, array $document, int $
  */
 function hr_sa_trip_build_bike_nodes(string $canonical, array $document, string $org_id, int $post_id): ?array
 {
-    $bike_list   = $document['bikes']['list'] ?? hr_sa_hrdf_get('hrdf.bikes.list', $post_id, []);
-    $bike_offers = $document['bikes']['offers'] ?? hr_sa_hrdf_get('hrdf.bikes.offers', $post_id, []);
+    $vehicle_blocks = hr_sa_trip_document_path($document, ['trip', 'vehicles']);
+    if (!is_array($vehicle_blocks) || !$vehicle_blocks) {
+        $vehicle_blocks = hr_sa_trip_document_path($document, ['bikes', 'list']);
+    }
+    if (!is_array($vehicle_blocks) || !$vehicle_blocks) {
+        $vehicle_blocks = hr_sa_hrdf_get_first([
+            'hrdf.trip.vehicles',
+            'hrdf.bikes.list',
+        ], $post_id, []);
+    }
 
-    if (!is_array($bike_list) || !is_array($bike_offers) || !$bike_list || !$bike_offers) {
+    if (!is_array($vehicle_blocks) || !$vehicle_blocks) {
         return null;
     }
 
     $vehicles = [];
     $vehicle_index = [];
+    $offers = [];
 
-    foreach ($bike_list as $index => $bike) {
+    foreach ($vehicle_blocks as $index => $bike) {
         if (!is_array($bike)) {
             continue;
         }
@@ -503,7 +794,7 @@ function hr_sa_trip_build_bike_nodes(string $canonical, array $document, string 
             continue;
         }
 
-        $node_id = rtrim($canonical, '/') . '#bike-' . sanitize_title($bike_id);
+        $node_id = rtrim($canonical, '/') . '#vehicle-' . sanitize_title($bike_id);
         $vehicle = [
             '@type' => 'Vehicle',
             '@id'   => $node_id,
@@ -533,49 +824,70 @@ function hr_sa_trip_build_bike_nodes(string $canonical, array $document, string 
 
         $vehicles[] = $vehicle;
         $vehicle_index[$bike_id] = $node_id;
+
+        if (!empty($bike['offers']) && is_array($bike['offers'])) {
+            foreach ($bike['offers'] as $raw_offer) {
+                if (!is_array($raw_offer)) {
+                    continue;
+                }
+
+                $normalized = hr_sa_trip_normalize_offer($raw_offer);
+                if ($normalized === null) {
+                    continue;
+                }
+
+                $normalized['itemOffered'] = ['@id' => $node_id];
+                if ($org_id !== '') {
+                    $normalized['seller'] = [
+                        '@type' => 'Organization',
+                        '@id'   => $org_id,
+                    ];
+                }
+
+                $offers[] = $normalized;
+            }
+        }
     }
 
     if (!$vehicles) {
         return null;
     }
 
-    $offers = [];
-    foreach ($bike_offers as $offer) {
-        if (!is_array($offer)) {
-            continue;
-        }
+    $bike_offers = hr_sa_trip_document_path($document, ['bikes', 'offers']);
+    if (!is_array($bike_offers) || !$bike_offers) {
+        $bike_offers = hr_sa_hrdf_get_first([
+            'hrdf.bikes.offers',
+        ], $post_id, []);
+    }
 
-        $vehicle_key = isset($offer['vehicle_id']) ? (string) $offer['vehicle_id'] : '';
-        if ($vehicle_key === '' || !isset($vehicle_index[$vehicle_key])) {
-            continue;
-        }
-
-        $schema_offer = ['@type' => 'Offer'];
-
-        foreach (['price', 'priceCurrency', 'availability', 'url'] as $field) {
-            if (!empty($offer[$field]) && is_string($offer[$field])) {
-                $value = $field === 'url' ? hr_sa_normalize_url($offer[$field]) : $offer[$field];
-                if ($value) {
-                    $schema_offer[$field] = $value;
-                }
+    if (is_array($bike_offers)) {
+        foreach ($bike_offers as $offer) {
+            if (!is_array($offer)) {
+                continue;
             }
-        }
 
-        if (!empty($offer['price']) && is_numeric($offer['price'])) {
-            $schema_offer['price'] = (string) $offer['price'];
-        }
+            $vehicle_key = isset($offer['vehicle_id']) ? (string) $offer['vehicle_id'] : '';
+            if ($vehicle_key === '' || !isset($vehicle_index[$vehicle_key])) {
+                continue;
+            }
 
-        $schema_offer['itemOffered'] = [
-            '@id' => $vehicle_index[$vehicle_key],
-        ];
+            $normalized = hr_sa_trip_normalize_offer($offer);
+            if ($normalized === null) {
+                continue;
+            }
 
-        $schema_offer['seller'] = [
-            '@type' => 'Organization',
-            '@id'   => $org_id,
-        ];
+            $normalized['itemOffered'] = [
+                '@id' => $vehicle_index[$vehicle_key],
+            ];
 
-        if (count($schema_offer) > 2) {
-            $offers[] = $schema_offer;
+            if ($org_id !== '') {
+                $normalized['seller'] = [
+                    '@type' => 'Organization',
+                    '@id'   => $org_id,
+                ];
+            }
+
+            $offers[] = $normalized;
         }
     }
 
@@ -592,7 +904,16 @@ function hr_sa_trip_build_bike_nodes(string $canonical, array $document, string 
  */
 function hr_sa_trip_build_stopovers_node(string $canonical, array $document, int $post_id): ?array
 {
-    $stopovers = $document['stopovers']['list'] ?? hr_sa_hrdf_get('hrdf.stopovers.list', $post_id, []);
+    $stopovers = hr_sa_trip_document_path($document, ['trip', 'stopovers']);
+    if (!is_array($stopovers) || !$stopovers) {
+        $stopovers = hr_sa_trip_document_path($document, ['stopovers', 'list']);
+    }
+    if (!is_array($stopovers) || !$stopovers) {
+        $stopovers = hr_sa_hrdf_get_first([
+            'hrdf.trip.stopovers',
+            'hrdf.stopovers.list',
+        ], $post_id, []);
+    }
     if (!is_array($stopovers) || !$stopovers) {
         return null;
     }
@@ -646,7 +967,16 @@ function hr_sa_trip_build_stopovers_node(string $canonical, array $document, int
  */
 function hr_sa_trip_build_guide_nodes(string $canonical, array $document, int $post_id): array
 {
-    $guides = $document['guides']['list'] ?? hr_sa_hrdf_get('hrdf.guides.list', $post_id, []);
+    $guides = hr_sa_trip_document_path($document, ['trip', 'guides']);
+    if (!is_array($guides) || !$guides) {
+        $guides = hr_sa_trip_document_path($document, ['guides', 'list']);
+    }
+    if (!is_array($guides) || !$guides) {
+        $guides = hr_sa_hrdf_get_first([
+            'hrdf.trip.guides',
+            'hrdf.guides.list',
+        ], $post_id, []);
+    }
     if (!is_array($guides) || !$guides) {
         return [];
     }
