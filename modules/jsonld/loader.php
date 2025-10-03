@@ -144,6 +144,312 @@ function hr_sa_jsonld_encode($data): string
 }
 
 /**
+ * Normalize multi-line or HTML content to plain text.
+ *
+ * @param mixed $content
+ */
+function hr_sa_jsonld_clean_text($content, int $words = 0): string
+{
+    $text = wp_strip_all_tags((string) $content, true);
+    $text = (string) preg_replace('/\s+/u', ' ', $text);
+    $text = trim($text);
+
+    if ($words > 0 && $text !== '') {
+        $parts = preg_split('/\s+/u', $text) ?: [];
+        if (count($parts) > $words) {
+            $text = implode(' ', array_slice($parts, 0, $words)) . '…';
+        }
+    }
+
+    return $text;
+}
+
+/**
+ * Remove empty values from a node array while preserving nested arrays.
+ *
+ * @param array<string, mixed> $data
+ *
+ * @return array<string, mixed>
+ */
+function hr_sa_jsonld_array_filter(array $data): array
+{
+    return array_filter(
+        $data,
+        static function ($value) {
+            if ($value === null) {
+                return false;
+            }
+
+            if ($value === '') {
+                return false;
+            }
+
+            if (is_array($value)) {
+                return !empty($value);
+            }
+
+            return true;
+        }
+    );
+}
+
+/**
+ * Normalize URL values and discard invalid ones.
+ */
+function hr_sa_jsonld_normalize_url($value): string
+{
+    if (!is_string($value)) {
+        return '';
+    }
+
+    $value = trim($value);
+    if ($value === '') {
+        return '';
+    }
+
+    $url = esc_url_raw($value);
+
+    return is_string($url) ? $url : '';
+}
+
+/**
+ * Normalize ISO-8601 date values.
+ */
+function hr_sa_jsonld_normalize_iso8601($value): string
+{
+    if (!is_string($value)) {
+        return '';
+    }
+
+    $value = trim($value);
+    if ($value === '') {
+        return '';
+    }
+
+    $pattern = '/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(?::\d{2})?(Z|[+\-]\d{2}:?\d{2})?)?$/';
+
+    return preg_match($pattern, $value) === 1 ? $value : '';
+}
+
+/**
+ * Normalize availability enumerations to schema.org URLs.
+ */
+function hr_sa_jsonld_normalize_availability($value): string
+{
+    if (!is_string($value)) {
+        return '';
+    }
+
+    $value = trim($value);
+    if ($value === '') {
+        return '';
+    }
+
+    $url = hr_sa_jsonld_normalize_url($value);
+    if ($url !== '') {
+        return $url;
+    }
+
+    $map = [
+        'instock'             => 'https://schema.org/InStock',
+        'outofstock'          => 'https://schema.org/OutOfStock',
+        'soldout'             => 'https://schema.org/SoldOut',
+        'limitedavailability' => 'https://schema.org/LimitedAvailability',
+        'preorder'            => 'https://schema.org/PreOrder',
+        'presale'             => 'https://schema.org/PreOrder',
+        'preorderavailable'   => 'https://schema.org/PreOrder',
+    ];
+
+    $key = strtolower(preg_replace('/[^a-z]/u', '', $value));
+
+    return $map[$key] ?? '';
+}
+
+/**
+ * Normalize QuantitativeValue data structures.
+ *
+ * @param mixed $value
+ */
+function hr_sa_jsonld_prepare_quantitative_value($value): ?array
+{
+    if (is_array($value)) {
+        $numeric = $value['value'] ?? null;
+        if ($numeric === null || $numeric === '') {
+            return null;
+        }
+
+        if (!is_numeric($numeric)) {
+            return null;
+        }
+
+        $result = [
+            '@type' => 'QuantitativeValue',
+            'value' => 0 + $numeric,
+        ];
+
+        if (!empty($value['unitCode']) && is_string($value['unitCode'])) {
+            $result['unitCode'] = strtoupper(trim((string) $value['unitCode']));
+        }
+
+        return hr_sa_jsonld_array_filter($result);
+    }
+
+    if (is_numeric($value)) {
+        return [
+            '@type' => 'QuantitativeValue',
+            'value' => 0 + $value,
+        ];
+    }
+
+    if (is_string($value) && $value !== '' && is_numeric($value)) {
+        return [
+            '@type' => 'QuantitativeValue',
+            'value' => 0 + $value,
+        ];
+    }
+
+    return null;
+}
+
+/**
+ * Build an Offer node from HRDF data.
+ *
+ * @param array<string, mixed> $raw
+ */
+function hr_sa_jsonld_prepare_offer(array $raw, string $default_url = ''): ?array
+{
+    $price = $raw['price'] ?? null;
+    if ($price === null || $price === '') {
+        return null;
+    }
+
+    if (is_numeric($price)) {
+        $price = number_format((float) $price, 2, '.', '');
+    } else {
+        $price = trim((string) $price);
+    }
+
+    if ($price === '') {
+        return null;
+    }
+
+    $currency = $raw['currency'] ?? '';
+    $currency = is_string($currency) ? strtoupper(trim($currency)) : '';
+    if ($currency === '' || preg_match('/^[A-Z]{3}$/', $currency) !== 1) {
+        return null;
+    }
+
+    $offer = [
+        '@type'         => 'Offer',
+        'price'         => $price,
+        'priceCurrency' => $currency,
+    ];
+
+    $availability = hr_sa_jsonld_normalize_availability($raw['availability'] ?? '');
+    if ($availability !== '') {
+        $offer['availability'] = $availability;
+    }
+
+    $mapping = [
+        'availabilityStarts' => 'availability_starts',
+        'availabilityEnds'   => 'availability_ends',
+        'validFrom'          => 'valid_from',
+        'validThrough'       => 'valid_through',
+        'priceValidUntil'    => 'price_valid_until',
+    ];
+
+    foreach ($mapping as $property => $source) {
+        if (!isset($raw[$source])) {
+            continue;
+        }
+
+        $value = hr_sa_jsonld_normalize_iso8601($raw[$source]);
+        if ($value !== '') {
+            $offer[$property] = $value;
+        }
+    }
+
+    $url = hr_sa_jsonld_normalize_url($raw['url'] ?? '');
+    if ($url === '' && $default_url !== '') {
+        $url = $default_url;
+    }
+
+    if ($url !== '') {
+        $offer['url'] = $url;
+    }
+
+    $quantitative = [
+        'inventoryLevel'   => $raw['inventory_level'] ?? null,
+        'eligibleQuantity' => $raw['eligible_quantity'] ?? null,
+    ];
+
+    foreach ($quantitative as $property => $source_value) {
+        $value = hr_sa_jsonld_prepare_quantitative_value($source_value);
+        if ($value !== null) {
+            $offer[$property] = $value;
+        }
+    }
+
+    if (isset($raw['description'])) {
+        $description = hr_sa_jsonld_clean_text($raw['description'], 60);
+        if ($description !== '') {
+            $offer['description'] = $description;
+        }
+    }
+
+    $string_fields = [
+        'name'         => 'name',
+        'sku'          => 'sku',
+        'category'     => 'category',
+        'itemCondition'=> 'item_condition',
+    ];
+
+    foreach ($string_fields as $property => $source) {
+        if (!isset($raw[$source])) {
+            continue;
+        }
+
+        $value = is_string($raw[$source]) ? trim($raw[$source]) : '';
+        if ($value !== '') {
+            $offer[$property] = $value;
+        }
+    }
+
+    $offer = hr_sa_jsonld_array_filter($offer);
+
+    return $offer ?: null;
+}
+
+/**
+ * Build a sanitized description fallback from post content.
+ */
+function hr_sa_jsonld_description_fallback(int $post_id, int $words = 0): string
+{
+    $excerpt = get_post_field('post_excerpt', $post_id);
+    if (is_string($excerpt) && $excerpt !== '') {
+        $text = hr_sa_jsonld_clean_text($excerpt, $words);
+        if ($text !== '') {
+            return $text;
+        }
+    }
+
+    $content = get_post_field('post_content', $post_id);
+    if (is_string($content) && $content !== '') {
+        $text = hr_sa_jsonld_clean_text($content, $words);
+        if ($text !== '') {
+            return $text;
+        }
+    }
+
+    $title = get_the_title($post_id);
+    if (is_string($title) && $title !== '') {
+        return hr_sa_jsonld_clean_text($title, $words);
+    }
+
+    return '';
+}
+
+/**
  * Normalize @type values to arrays of unique strings.
  */
 function hr_sa_jsonld_normalize_type($type): array
@@ -224,31 +530,37 @@ function hr_sa_jsonld_sanitize_answer_html(string $html): string
 }
 
 /**
- * Fetch schema setting from legacy option store.
- *
- * @param mixed $default
- * @return mixed
- */
-function hr_sa_jsonld_get_schema_option(string $key, $default = '')
-{
-    $options = get_option('hr_schema_settings', []);
-    if (is_array($options) && array_key_exists($key, $options) && $options[$key] !== '') {
-        return $options[$key];
-    }
-
-    return $default;
-}
-
-/**
  * Resolve the Organization logo URL.
  */
 function hr_sa_jsonld_get_logo_url(): string
 {
-    $logo_id = (int) hr_sa_jsonld_get_schema_option('org_logo_id', 0);
-    if ($logo_id > 0) {
-        $url = wp_get_attachment_image_url($logo_id, 'full');
-        if ($url) {
-            return $url;
+    $logo = hr_sa_hrdf_get('organization.logo', null, []);
+    if (is_array($logo)) {
+        if (!empty($logo['url'])) {
+            $url = hr_sa_jsonld_normalize_url($logo['url']);
+            if ($url !== '') {
+                return $url;
+            }
+        }
+
+        if (!empty($logo['attachment_id']) && is_numeric($logo['attachment_id'])) {
+            $attachment = wp_get_attachment_image_url((int) $logo['attachment_id'], 'full');
+            if ($attachment) {
+                return esc_url_raw($attachment);
+            }
+        }
+    }
+
+    $direct = hr_sa_jsonld_normalize_url(hr_sa_hrdf_get('organization.logo.url'));
+    if ($direct !== '') {
+        return $direct;
+    }
+
+    $attachment_id = hr_sa_hrdf_get('organization.logo.attachment_id');
+    if (is_numeric($attachment_id)) {
+        $attachment = wp_get_attachment_image_url((int) $attachment_id, 'full');
+        if ($attachment) {
+            return esc_url_raw($attachment);
         }
     }
 
@@ -256,11 +568,50 @@ function hr_sa_jsonld_get_logo_url(): string
     if ($theme_logo_id > 0) {
         $url = wp_get_attachment_image_url($theme_logo_id, 'full');
         if ($url) {
-            return $url;
+            return esc_url_raw($url);
         }
     }
 
     return '';
+}
+
+/**
+ * Build the ImageObject structure for the organization logo.
+ */
+function hr_sa_jsonld_build_logo_object(): ?array
+{
+    $logo_data = hr_sa_hrdf_get('organization.logo', null, []);
+    if (!is_array($logo_data)) {
+        $logo_data = [];
+    }
+
+    $url = hr_sa_jsonld_get_logo_url();
+    if ($url === '') {
+        return null;
+    }
+
+    $logo = [
+        '@type' => 'ImageObject',
+        'url'   => $url,
+    ];
+
+    if (isset($logo_data['width']) && is_numeric($logo_data['width'])) {
+        $logo['width'] = (int) $logo_data['width'];
+    }
+
+    if (isset($logo_data['height']) && is_numeric($logo_data['height'])) {
+        $logo['height'] = (int) $logo_data['height'];
+    }
+
+    if (isset($logo_data['caption']) && is_string($logo_data['caption']) && $logo_data['caption'] !== '') {
+        $logo['caption'] = $logo_data['caption'];
+    }
+
+    if (isset($logo_data['representativeOfPage']) && is_bool($logo_data['representativeOfPage'])) {
+        $logo['representativeOfPage'] = $logo_data['representativeOfPage'];
+    }
+
+    return hr_sa_jsonld_array_filter($logo) ?: null;
 }
 
 /**
@@ -290,31 +641,6 @@ function hr_sa_jsonld_website_id(): string
 /**
  * Determine current URL similar to legacy behavior.
  */
-function hr_sa_jsonld_current_url(): string
-{
-    if (is_front_page() || is_home()) {
-        return hr_sa_jsonld_site_url();
-    }
-
-    if (is_singular()) {
-        $permalink = get_permalink();
-        if ($permalink) {
-            return trailingslashit($permalink);
-        }
-    }
-
-    global $wp;
-    if ($wp instanceof WP) {
-        $request = (string) $wp->request;
-        if ($request !== '') {
-            return home_url(add_query_arg([], $request));
-        }
-    }
-
-    $uri = isset($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '/';
-    return home_url($uri);
-}
-
 /**
  * Force all internal URLs to HTTPS.
  *
@@ -405,105 +731,168 @@ function hr_sa_jsonld_enforce_org_and_brand(array $graph): array
 }
 
 /**
- * Build the Organization node using legacy settings.
+ * Build the Organization node using HRDF data.
  */
 function hr_sa_jsonld_build_organization_node(): array
 {
-    $site_url    = hr_sa_jsonld_site_url();
+    $site_url = hr_sa_jsonld_site_url();
+
+    $name = hr_sa_hrdf_get('organization.name');
+    if (!is_string($name) || $name === '') {
+        $name = get_bloginfo('name');
+    }
+
+    $url = hr_sa_jsonld_normalize_url(hr_sa_hrdf_get('organization.url'));
+    if ($url === '') {
+        $url = $site_url;
+    }
+
     $organization = [
         '@type' => 'Organization',
         '@id'   => hr_sa_jsonld_org_id(),
-        'name'  => (string) hr_sa_jsonld_get_schema_option('org_name', get_bloginfo('name')),
-        'url'   => $site_url,
+        'name'  => $name,
+        'url'   => $url,
     ];
 
-    $logo_url = hr_sa_jsonld_get_logo_url();
-    if ($logo_url) {
-        $organization['logo'] = [
-            '@type' => 'ImageObject',
-            'url'   => $logo_url,
-        ];
+    $logo = hr_sa_jsonld_build_logo_object();
+    if ($logo) {
+        $organization['logo'] = $logo;
     }
 
-    $optionals = [
-        'legalName'    => 'org_legal_name',
-        'slogan'       => 'org_slogan',
-        'description'  => 'org_description',
-        'foundingDate' => 'org_founding_date',
+    $string_fields = [
+        'legalName'   => 'organization.legal_name',
+        'slogan'      => 'organization.slogan',
+        'description' => 'organization.description',
+        'email'       => 'organization.email',
+        'taxID'       => 'organization.tax_id',
+        'vatID'       => 'organization.vat_id',
+        'duns'        => 'organization.duns',
     ];
 
-    foreach ($optionals as $field => $key) {
-        $value = hr_sa_jsonld_get_schema_option($key);
+    foreach ($string_fields as $property => $path) {
+        $value = hr_sa_hrdf_get($path);
+        if (!is_string($value) || $value === '') {
+            continue;
+        }
+
+        if ($property === 'description') {
+            $value = hr_sa_jsonld_clean_text($value, 80);
+        }
+
         if ($value !== '') {
-            $organization[$field] = $value;
+            $organization[$property] = $value;
         }
     }
 
-    $address = [
-        'streetAddress'   => hr_sa_jsonld_get_schema_option('org_address_street'),
-        'addressLocality' => hr_sa_jsonld_get_schema_option('org_address_locality'),
-        'addressRegion'   => hr_sa_jsonld_get_schema_option('org_address_region'),
-        'postalCode'      => hr_sa_jsonld_get_schema_option('org_address_postal'),
-        'addressCountry'  => hr_sa_jsonld_get_schema_option('org_address_country'),
+    $founding_date = hr_sa_jsonld_normalize_iso8601(hr_sa_hrdf_get('organization.founding_date'));
+    if ($founding_date !== '') {
+        $organization['foundingDate'] = $founding_date;
+    }
+
+    $telephone = hr_sa_hrdf_get('organization.telephone');
+    if (is_string($telephone) && $telephone !== '') {
+        $sanitized = preg_replace('/\s+/u', '', $telephone);
+        $organization['telephone'] = $sanitized ?: $telephone;
+    }
+
+    $address_data = hr_sa_hrdf_get('organization.address');
+    if (!is_array($address_data)) {
+        $address_data = [];
+    }
+
+    $address_fields = [
+        'streetAddress',
+        'addressLocality',
+        'addressRegion',
+        'postalCode',
+        'addressCountry',
     ];
 
-    if (array_filter($address, static fn($value) => $value !== '')) {
+    $address = [];
+    foreach ($address_fields as $field) {
+        $value = '';
+        if (isset($address_data[$field])) {
+            $value = is_string($address_data[$field]) ? trim($address_data[$field]) : '';
+        } else {
+            $candidate = hr_sa_hrdf_get('organization.address.' . $field);
+            $value     = is_string($candidate) ? trim($candidate) : '';
+        }
+
+        if ($value !== '') {
+            $address[$field] = $value;
+        }
+    }
+
+    if ($address) {
         $organization['address'] = array_merge(['@type' => 'PostalAddress'], $address);
     }
 
-    $same_as_raw = hr_sa_jsonld_get_schema_option('org_sameas', '');
-    if ($same_as_raw !== '') {
-        $same_as = [];
-        foreach (preg_split('/\r\n|\r|\n/', (string) $same_as_raw) as $line) {
-            $line = trim((string) $line);
-            if ($line === '') {
-                continue;
-            }
-            $same_as[] = esc_url_raw($line);
-        }
-        if ($same_as) {
-            $organization['sameAs'] = $same_as;
+    $same_as = hr_sa_hrdf_get_array('organization.same_as');
+    if ($same_as) {
+        $normalized = array_values(array_filter(array_map('hr_sa_jsonld_normalize_url', $same_as)));
+        if ($normalized) {
+            $organization['sameAs'] = $normalized;
         }
     }
 
-    $contact_points_raw = hr_sa_jsonld_get_schema_option('org_contact_points', '');
-    if ($contact_points_raw !== '') {
-        $decoded = json_decode((string) $contact_points_raw, true);
-        if (is_array($decoded) && $decoded) {
-            $contact_points = [];
-            foreach ($decoded as $row) {
-                if (!is_array($row)) {
-                    continue;
-                }
-
-                $contact_point = ['@type' => 'ContactPoint'];
-                if (!empty($row['contactType'])) {
-                    $contact_point['contactType'] = $row['contactType'];
-                }
-                if (!empty($row['telephone'])) {
-                    $contact_point['telephone'] = preg_replace('/\s+/u', '', (string) $row['telephone']);
-                }
-                if (!empty($row['email'])) {
-                    $contact_point['email'] = $row['email'];
-                }
-                if (!empty($row['areaServed'])) {
-                    $contact_point['areaServed'] = $row['areaServed'];
-                }
-                if (!empty($row['availableLanguage'])) {
-                    $contact_point['availableLanguage'] = $row['availableLanguage'];
-                }
-                if (!empty($row['contactOption'])) {
-                    $contact_point['contactOption'] = $row['contactOption'];
-                }
-
-                if (!empty($contact_point['telephone']) || !empty($contact_point['email'])) {
-                    $contact_points[] = $contact_point;
-                }
+    $contact_points = hr_sa_hrdf_get_array('organization.contact_points');
+    if ($contact_points) {
+        $normalized_points = [];
+        foreach ($contact_points as $row) {
+            if (!is_array($row)) {
+                continue;
             }
 
-            if ($contact_points) {
-                $organization['contactPoint'] = $contact_points;
+            $point = ['@type' => 'ContactPoint'];
+
+            $type = $row['contactType'] ?? $row['contact_type'] ?? '';
+            if (is_string($type) && $type !== '') {
+                $point['contactType'] = $type;
             }
+
+            $phone = $row['telephone'] ?? $row['phone'] ?? '';
+            if (is_string($phone) && $phone !== '') {
+                $point['telephone'] = preg_replace('/\s+/u', '', $phone) ?: $phone;
+            }
+
+            $email = $row['email'] ?? '';
+            if (is_string($email) && $email !== '') {
+                $point['email'] = $email;
+            }
+
+            $area = $row['areaServed'] ?? $row['area_served'] ?? '';
+            if (is_string($area) && $area !== '') {
+                $point['areaServed'] = $area;
+            }
+
+            $languages = $row['availableLanguage'] ?? $row['available_language'] ?? '';
+            if (is_array($languages)) {
+                $languages = array_values(array_filter(array_map('strval', $languages)));
+                if ($languages) {
+                    $point['availableLanguage'] = $languages;
+                }
+            } elseif (is_string($languages) && $languages !== '') {
+                $point['availableLanguage'] = $languages;
+            }
+
+            $options = $row['contactOption'] ?? $row['contact_option'] ?? '';
+            if (is_array($options)) {
+                $options = array_values(array_filter(array_map('strval', $options)));
+                if ($options) {
+                    $point['contactOption'] = $options;
+                }
+            } elseif (is_string($options) && $options !== '') {
+                $point['contactOption'] = $options;
+            }
+
+            $point = hr_sa_jsonld_array_filter($point);
+            if (!empty($point['telephone']) || !empty($point['email'])) {
+                $normalized_points[] = $point;
+            }
+        }
+
+        if ($normalized_points) {
+            $organization['contactPoint'] = $normalized_points;
         }
     }
 
@@ -515,12 +904,46 @@ function hr_sa_jsonld_build_organization_node(): array
  */
 function hr_sa_jsonld_build_website_node(): array
 {
-    return [
+    $site_url = hr_sa_jsonld_site_url();
+
+    $url = hr_sa_jsonld_normalize_url(hr_sa_hrdf_get('website.url'));
+    if ($url === '') {
+        $url = $site_url;
+    }
+
+    $name = hr_sa_hrdf_get('website.name');
+    if (!is_string($name) || $name === '') {
+        $name = get_bloginfo('name');
+    }
+
+    $website = [
         '@type' => 'WebSite',
         '@id'   => hr_sa_jsonld_website_id(),
-        'url'   => hr_sa_jsonld_site_url(),
-        'name'  => get_bloginfo('name'),
+        'url'   => $url,
+        'name'  => $name,
     ];
+
+    $alternate_name = hr_sa_hrdf_get('website.alternate_name');
+    if (is_string($alternate_name) && $alternate_name !== '') {
+        $website['alternateName'] = $alternate_name;
+    }
+
+    $description = hr_sa_hrdf_get('website.description');
+    if (is_string($description) && $description !== '') {
+        $website['description'] = hr_sa_jsonld_clean_text($description, 80);
+    }
+
+    $in_language = hr_sa_hrdf_get('website.in_language');
+    if (is_string($in_language) && $in_language !== '') {
+        $website['inLanguage'] = $in_language;
+    }
+
+    $potential_action = hr_sa_hrdf_get('website.potential_action');
+    if (is_array($potential_action) && !empty($potential_action)) {
+        $website['potentialAction'] = $potential_action;
+    }
+
+    return $website;
 }
 
 /**
@@ -528,16 +951,70 @@ function hr_sa_jsonld_build_website_node(): array
  */
 function hr_sa_jsonld_build_webpage_node(): array
 {
-    $current_url = hr_sa_jsonld_current_url();
+    $post_id = get_queried_object_id();
 
-    return [
+    $url = hr_sa_jsonld_normalize_url(hr_sa_hrdf_get('webpage.url', $post_id));
+    if ($url === '' && $post_id) {
+        $url = hr_sa_jsonld_normalize_url(hr_sa_hrdf_get('trip.product.url', $post_id));
+    }
+
+    if ($url === '') {
+        return [];
+    }
+
+    $node = [
         '@type'    => 'WebPage',
-        '@id'      => trailingslashit($current_url) . '#webpage',
-        'url'      => $current_url,
-        'name'     => function_exists('wp_get_document_title') ? wp_get_document_title() : get_the_title(),
+        '@id'      => trailingslashit($url) . '#webpage',
+        'url'      => $url,
         'isPartOf' => ['@id' => hr_sa_jsonld_website_id()],
         'about'    => ['@id' => hr_sa_jsonld_org_id()],
     ];
+
+    $name = hr_sa_hrdf_get('webpage.name', $post_id);
+    if ((!is_string($name) || $name === '') && $post_id) {
+        $name = hr_sa_hrdf_get('trip.product.name', $post_id);
+    }
+    if (is_string($name) && $name !== '') {
+        $node['name'] = $name;
+    }
+
+    $description = hr_sa_hrdf_get('webpage.description', $post_id);
+    if ((!is_string($description) || $description === '') && $post_id) {
+        $description = hr_sa_hrdf_get('trip.product.description', $post_id);
+        if (!is_string($description) || $description === '') {
+            $description = hr_sa_jsonld_description_fallback($post_id, 60);
+        }
+    }
+    if (is_string($description) && $description !== '') {
+        $node['description'] = $description;
+    }
+
+    $primary_image = hr_sa_jsonld_normalize_url(hr_sa_hrdf_get('webpage.primary_image', $post_id));
+    if ($primary_image !== '') {
+        $node['image'] = $primary_image;
+    }
+
+    $breadcrumb = hr_sa_hrdf_get('webpage.breadcrumb', $post_id);
+    if (is_array($breadcrumb) && !empty($breadcrumb)) {
+        $node['breadcrumb'] = $breadcrumb;
+    }
+
+    $speakable = hr_sa_hrdf_get('webpage.speakable', $post_id);
+    if (is_array($speakable) && !empty($speakable)) {
+        $node['speakable'] = $speakable;
+    }
+
+    $date_published = hr_sa_jsonld_normalize_iso8601(hr_sa_hrdf_get('webpage.date_published', $post_id));
+    if ($date_published !== '') {
+        $node['datePublished'] = $date_published;
+    }
+
+    $date_modified = hr_sa_jsonld_normalize_iso8601(hr_sa_hrdf_get('webpage.date_modified', $post_id));
+    if ($date_modified !== '') {
+        $node['dateModified'] = $date_modified;
+    }
+
+    return $node;
 }
 
 require_once __DIR__ . '/org.php';

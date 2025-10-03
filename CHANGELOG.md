@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **1.0.0**: Stable release – OG + JSON-LD parity, diagnostics.
 - **2.0.0**: AI Assist module (OpenAI) for titles/descriptions/keywords.
 
+## [0.3.1] - 2025-10-08
+### Changed
+- Refactored all JSON-LD emitters to source organization, product, itinerary, FAQ, vehicle, and review data from the HR Data Framework with a constrained fallback policy.
+- Introduced HRDF helper shims and offer sanitizers so schema nodes are normalized before emission and previewed consistently in the admin UI.
+- Documented the HRDF dependency via `/prompt-to-second-agent.md` to unblock removal of temporary fallbacks for organization identity and trip descriptions.
+
 ## [0.3.0] - 2025-10-07
 ### Added
 - Module registry with independent enable/disable states and nonce-protected AJAX toggles persisted in `hrsa_modules_enabled`.

@@ -20,9 +20,16 @@ hr_sa_jsonld_register_emitter('org', 'hr_sa_jsonld_emit_org_graph');
  */
 function hr_sa_jsonld_emit_org_graph(): array
 {
-    return [
+    $nodes = [
         hr_sa_jsonld_build_organization_node(),
         hr_sa_jsonld_build_website_node(),
         hr_sa_jsonld_build_webpage_node(),
     ];
+
+    return array_values(
+        array_filter(
+            $nodes,
+            static fn($node) => is_array($node) && !empty($node)
+        )
+    );
 }

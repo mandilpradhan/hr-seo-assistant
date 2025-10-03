@@ -7,8 +7,6 @@
 
 declare(strict_types=1);
 
-
-
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -40,256 +38,7 @@ function hr_sa_trip_emit_nodes(): array
 }
 
 /**
- * Trim and normalize text pulled from post content.
- */
-function hr_sa_trip_clean_text($html, int $words = 0): string
-{
-    $text = wp_strip_all_tags((string) $html, true);
-    $text = (string) preg_replace('/\s+/u', ' ', $text);
-    $text = trim($text);
-
-    if ($words > 0) {
-        $parts = preg_split('/\s+/u', $text);
-        if ($parts && count($parts) > $words) {
-            $text = implode(' ', array_slice($parts, 0, $words)) . '…';
-        }
-    }
-
-    return $text;
-}
-
-/**
- * Collect unique image URLs for a trip.
- *
- * @return array<int, string>
- */
-function hr_sa_trip_images(int $post_id, int $max = 8): array
-{
-    $urls = [];
-
-    $thumb_id = get_post_thumbnail_id($post_id);
-    if ($thumb_id) {
-        $thumb_url = wp_get_attachment_image_url($thumb_id, 'full');
-        if ($thumb_url) {
-            $urls[] = $thumb_url;
-        }
-    }
-
-    $attachments = get_attached_media('image', $post_id);
-    foreach ($attachments as $attachment) {
-        $url = wp_get_attachment_image_url($attachment->ID, 'full');
-        if ($url) {
-            $urls[] = $url;
-        }
-    }
-
-    $urls = array_values(array_unique($urls));
-    if ($max > 0) {
-        $urls = array_slice($urls, 0, $max);
-    }
-
-    return $urls;
-}
-
-/**
- * Build Product.additionalProperty entries from ACF/meta fields.
- *
- * @return array<int, array<string, mixed>>
- */
-function hr_sa_trip_additional_properties(int $post_id): array
-{
-    $properties = [];
-    $map = [
-        'Duration'   => 'duration',
-        'Distance'   => 'distance',
-        'Seasons'    => 'seasons',
-        'Group Size' => 'group_size',
-    ];
-
-    $getter = static function (string $key) use ($post_id) {
-        if (function_exists('get_field')) {
-            return get_field($key, $post_id);
-        }
-
-        return get_post_meta($post_id, $key, true);
-    };
-
-    foreach ($map as $label => $key) {
-        $value = $getter($key);
-        if ($value === null || $value === '' || $value === []) {
-            continue;
-        }
-
-        if (is_array($value)) {
-            $value = array_values(array_filter(array_map('wp_strip_all_tags', $value)));
-            $value = implode(', ', $value);
-        } else {
-            $value = hr_sa_trip_clean_text($value);
-        }
-
-        if ($value !== '') {
-            $properties[] = [
-                '@type' => 'PropertyValue',
-                'name'  => $label,
-                'value' => $value,
-            ];
-        }
-    }
-
-    return $properties;
-}
-
-/**
- * Build additional PropertyValue/WebPage nodes.
- *
- * @return array{0: array<int, array<string, mixed>>, 1: array<int, array<string, mixed>>, 2: array<int, array<string, string>>}
- */
-function hr_sa_trip_additional_nodes(int $trip_id, string $product_id, array $country_term_ids): array
-{
-    $posts = get_posts([
-        'post_type'      => 'additional',
-        'posts_per_page' => 10,
-        'tax_query'      => [
-            [
-                'taxonomy' => 'country',
-                'field'    => 'term_id',
-                'terms'    => $country_term_ids,
-            ],
-        ],
-        'post_status'    => 'publish',
-        'orderby'        => 'menu_order',
-        'order'          => 'ASC',
-    ]);
-
-    if (!$posts) {
-        return [[], [], []];
-    }
-
-    $property_values = [];
-    $webpages        = [];
-    $has_parts       = [];
-
-    foreach ($posts as $post) {
-        $url         = get_permalink($post->ID);
-        $name        = get_the_title($post->ID) ?: 'Additional Information';
-        $description = hr_sa_trip_clean_text(strip_shortcodes($post->post_content), 40);
-
-        $property = [
-            '@type' => 'PropertyValue',
-            'name'  => $name,
-            'value' => $description ?: ($url ?: ''),
-        ];
-
-        if ($url) {
-            $property['valueReference'] = [
-                '@type' => 'WebPage',
-                'url'   => $url,
-            ];
-        }
-
-        $property_values[] = $property;
-    }
-
-    $trip_url      = get_permalink($trip_id);
-    $additional_id = $trip_url ? ($trip_url . '#additional-details') : ($product_id . '-details');
-
-    $webpages[] = [
-        '@type' => 'WebPage',
-        '@id'   => $additional_id,
-        'name'  => 'Additional Details',
-    ];
-
-    $has_parts[] = ['@id' => $additional_id];
-
-    return [$property_values, $webpages, $has_parts];
-}
-
-/**
- * Build Offer nodes using WTE/ACF data helpers.
- *
- * @return array<int, array<string, mixed>>
- */
-function hr_sa_trip_build_offers(int $trip_id, string $trip_url): array
-{
-    if (!function_exists('_hr_acf_fetch_trip_data')) {
-        return [];
-    }
-
-    $offers = [];
-    $data   = _hr_acf_fetch_trip_data($trip_id);
-    if (!$data || empty($data['dates'])) {
-        return $offers;
-    }
-
-    $rider_price   = isset($data['rider']) ? (float) $data['rider'] : null;
-    $threshold     = defined('HR_THRESHOLD_MIN_SPOTS') ? (int) HR_THRESHOLD_MIN_SPOTS : 4;
-    $duration_days = null;
-
-    if (function_exists('hr_trip_duration_days')) {
-        $duration_days = (int) hr_trip_duration_days($trip_id);
-        if ($duration_days <= 0) {
-            $duration_days = null;
-        }
-    }
-
-    $today = current_time('Y-m-d');
-
-    foreach ($data['dates'] as $ymd) {
-        if ($ymd < $today) {
-            continue;
-        }
-
-        $remaining = isset($data['remaining'][$ymd]) ? (int) $data['remaining'][$ymd] : null;
-        $seats     = isset($data['seats'][$ymd]) ? (int) $data['seats'][$ymd] : null;
-
-        if ($rider_price === null) {
-            continue;
-        }
-
-        if ($remaining !== null && $remaining < 0) {
-            $remaining = 0;
-        }
-
-        $availability = 'https://schema.org/InStock';
-        if ($remaining === 0) {
-            $availability = 'https://schema.org/SoldOut';
-        } elseif ($remaining !== null && $remaining <= $threshold) {
-            $availability = 'https://schema.org/LimitedAvailability';
-        }
-
-        $offer = [
-            '@type'              => 'Offer',
-            'price'              => (string) $rider_price,
-            'priceCurrency'      => 'USD',
-            'availability'       => $availability,
-            'availabilityStarts' => $ymd,
-            'url'                => trailingslashit($trip_url) . '#intro',
-            'inventoryLevel'     => $remaining !== null ? ['@type' => 'QuantitativeValue', 'value' => $remaining] : null,
-        ];
-
-        if ($seats !== null && $seats > 0) {
-            $offer['eligibleQuantity'] = [
-                '@type' => 'QuantitativeValue',
-                'value' => $seats,
-            ];
-        }
-
-        if ($duration_days !== null) {
-            $date = DateTime::createFromFormat('Y-m-d', $ymd);
-            if ($date instanceof DateTime) {
-                $date->modify('+' . max(0, $duration_days - 1) . ' day');
-                $offer['availabilityEnds'] = $date->format('Y-m-d');
-            }
-        }
-
-        $offers[] = array_filter($offer, static fn($value) => $value !== null && $value !== '');
-    }
-
-    return $offers;
-}
-
-/**
- * Build Product, Vehicle, Itinerary, Review, and Additional nodes for a trip.
+ * Build Product graph nodes for a trip.
  *
  * @return array<int, array<string, mixed>>
  */
@@ -299,235 +48,405 @@ function hr_sa_trip_build_product_nodes(int $trip_id): array
         return [];
     }
 
-    $trip_url = get_permalink($trip_id);
-    if (!$trip_url) {
+    $product_url = hr_sa_jsonld_normalize_url(hr_sa_hrdf_get('trip.product.url', $trip_id));
+    if ($product_url === '') {
         return [];
     }
-    $trip_url   = trailingslashit($trip_url);
-    $product_id = $trip_url . '#trip';
 
-    $brand_id = function_exists('hr_sa_jsonld_org_id')
-        ? hr_sa_jsonld_org_id()
-        : trailingslashit(set_url_scheme(home_url('/'), 'https')) . '#org';
+    $product_id = trailingslashit($product_url) . '#trip';
 
     $product = [
         '@type' => 'Product',
         '@id'   => $product_id,
-        'name'  => get_the_title($trip_id),
-        'image' => hr_sa_trip_images($trip_id),
+        'url'   => $product_url,
         'brand' => [
             '@type' => 'Brand',
-            '@id'   => $brand_id,
+            '@id'   => hr_sa_jsonld_org_id(),
         ],
-        'url'   => $trip_url,
     ];
 
-    if (empty($product['image'])) {
-        unset($product['image']);
+    $name = hr_sa_hrdf_get('trip.product.name', $trip_id);
+    if (is_string($name) && $name !== '') {
+        $product['name'] = $name;
     }
 
-    $description = '';
-    if (function_exists('get_field')) {
-        $description = (string) get_field('description', $trip_id);
-    }
-    if ($description === '') {
-        $description = (string) get_post_field('post_excerpt', $trip_id);
-    }
-    if ($description === '') {
-        $description = (string) get_post_field('post_content', $trip_id);
-    }
-    $description = hr_sa_trip_clean_text($description, 60);
-    if ($description !== '') {
-        $product['description'] = $description;
+    $images = hr_sa_trip_collect_product_images($trip_id);
+    if ($images) {
+        $product['image'] = $images;
     }
 
-    $properties = hr_sa_trip_additional_properties($trip_id);
-    if ($properties) {
-        $product['additionalProperty'] = $properties;
-    }
-
-    $offers = hr_sa_trip_build_offers($trip_id, $trip_url);
-    if ($offers) {
-        $prices = array_filter(array_map(static fn($offer) => isset($offer['price']) ? (float) $offer['price'] : null, $offers), static fn($value) => $value !== null);
-        if ($prices) {
-            $product['offers'] = [
-                '@type'         => 'AggregateOffer',
-                'offerCount'    => count($offers),
-                'priceCurrency' => 'USD',
-                'lowPrice'      => (string) min($prices),
-                'highPrice'     => (string) max($prices),
-                'offers'        => $offers,
-            ];
+    $description = hr_sa_hrdf_get('trip.product.description', $trip_id);
+    if (is_string($description) && $description !== '') {
+        $product['description'] = hr_sa_jsonld_clean_text($description, 60);
+    } else {
+        $fallback = hr_sa_jsonld_description_fallback($trip_id, 60);
+        if ($fallback !== '') {
+            $product['description'] = $fallback;
         }
+    }
+
+    $string_fields = [
+        'sku'      => 'trip.product.sku',
+        'mpn'      => 'trip.product.mpn',
+        'color'    => 'trip.product.color',
+        'category' => 'trip.product.category',
+    ];
+
+    foreach ($string_fields as $property => $path) {
+        $value = hr_sa_hrdf_get($path, $trip_id);
+        if (is_string($value) && $value !== '') {
+            $product[$property] = $value;
+        }
+    }
+
+    $additional_properties = hr_sa_trip_collect_additional_properties($trip_id);
+    if ($additional_properties) {
+        $product['additionalProperty'] = $additional_properties;
+    }
+
+    $offers = hr_sa_trip_collect_offers($trip_id, $product_url);
+    if ($offers) {
+        $aggregate_offer = hr_sa_trip_build_aggregate_offer($offers, $trip_id);
+        if ($aggregate_offer) {
+            $product['offers'] = $aggregate_offer;
+        }
+    }
+
+    $about_refs = hr_sa_trip_collect_about_references($trip_id);
+    if ($about_refs) {
+        $product['about'] = $about_refs;
+    }
+
+    $has_part_refs = hr_sa_trip_collect_has_part_references($trip_id);
+    if ($has_part_refs) {
+        $product['hasPart'] = $has_part_refs;
     }
 
     $graph         = [$product];
     $product_index = 0;
 
-    $country_terms = wp_get_post_terms($trip_id, 'country', ['fields' => 'ids']);
-    if (!is_wp_error($country_terms) && $country_terms) {
-        [$bike_nodes, $bike_names, $bike_about] = hr_sa_trip_bike_nodes($trip_id, $country_terms);
-
-        if ($bike_nodes) {
-            $offer_map = hr_sa_wte_build_vehicle_offer_map($trip_id, $trip_url);
-            if ($offer_map) {
-                foreach ($bike_nodes as &$bike_node) {
-                    if (empty($bike_node['name'])) {
-                        continue;
-                    }
-                    $key = hr_sa_norm_bike_name($bike_node['name']);
-                    if (isset($offer_map[$key])) {
-                        $bike_node['offers'] = $offer_map[$key];
-                    }
-                }
-                unset($bike_node);
-            }
-        }
-
-        foreach ($bike_nodes as $node) {
-            $graph[] = $node;
-        }
-
-        if ($bike_about) {
-            $graph[$product_index]['about'] = array_merge($graph[$product_index]['about'] ?? [], $bike_about);
-        }
-
-        if ($bike_names) {
-            $graph[$product_index]['additionalProperty'] = array_merge(
-                $graph[$product_index]['additionalProperty'] ?? [],
-                [
-                    [
-                        '@type' => 'PropertyValue',
-                        'name'  => 'Bikes Available',
-                        'value' => implode('; ', $bike_names),
-                    ],
-                ]
-            );
-        }
-
-        [$itinerary_node, $itinerary_about] = hr_sa_trip_itinerary_node($trip_id, $product_id, $country_terms);
-        if ($itinerary_node) {
-            $graph[] = $itinerary_node;
-        }
-        if ($itinerary_about) {
-            $graph[$product_index]['hasPart'] = array_merge($graph[$product_index]['hasPart'] ?? [], [$itinerary_about]);
-        }
-
-        [$review_nodes, $aggregate_rating] = hr_sa_trip_testimonials_nodes($trip_id, $product_id, $country_terms);
-        foreach ($review_nodes as $review) {
-            $graph[] = $review;
-        }
-        if ($aggregate_rating) {
-            $graph[$product_index]['aggregateRating'] = $aggregate_rating;
-        }
-
-        [$property_values, $detail_nodes, $has_parts] = hr_sa_trip_additional_nodes($trip_id, $product_id, $country_terms);
-        foreach ($detail_nodes as $node) {
-            $graph[] = $node;
-        }
-        if ($property_values) {
-            $graph[$product_index]['additionalProperty'] = array_merge($graph[$product_index]['additionalProperty'] ?? [], $property_values);
-        }
-        if ($has_parts) {
-            $graph[$product_index]['hasPart'] = array_merge($graph[$product_index]['hasPart'] ?? [], $has_parts);
-        }
-
-        $faq_nodes = hr_sa_trip_faq_nodes($trip_id);
-        foreach ($faq_nodes as $node) {
-            $graph[] = $node;
-        }
+    [$vehicle_nodes, $vehicle_about] = hr_sa_trip_bike_nodes($trip_id);
+    foreach ($vehicle_nodes as $vehicle_node) {
+        $graph[] = $vehicle_node;
     }
+    if ($vehicle_about) {
+        $product['about'] = array_merge($product['about'] ?? [], $vehicle_about);
+    }
+
+    [$itinerary_node, $itinerary_reference] = hr_sa_trip_itinerary_node($trip_id, $product_id);
+    if ($itinerary_node) {
+        $graph[] = $itinerary_node;
+    }
+    if ($itinerary_reference) {
+        $product['hasPart'] = array_merge($product['hasPart'] ?? [], [$itinerary_reference]);
+    }
+
+    [$review_nodes, $aggregate_rating] = hr_sa_trip_testimonials_nodes($trip_id, $product_id);
+    foreach ($review_nodes as $review_node) {
+        $graph[] = $review_node;
+    }
+    if ($aggregate_rating) {
+        $product['aggregateRating'] = $aggregate_rating;
+    }
+
+    $faq_nodes = hr_sa_trip_faq_nodes($trip_id);
+    foreach ($faq_nodes as $faq_node) {
+        $graph[] = $faq_node;
+    }
+
+    if (!empty($product['about'])) {
+        $product['about'] = array_values($product['about']);
+    }
+    if (!empty($product['hasPart'])) {
+        $product['hasPart'] = array_values($product['hasPart']);
+    }
+
+    $graph[$product_index] = $product;
 
     return $graph;
 }
 
 /**
- * Build Review nodes (and optional AggregateRating) from testimonials.
+ * Collect product images from HRDF.
+ *
+ * @return array<int, string>
+ */
+function hr_sa_trip_collect_product_images(int $trip_id): array
+{
+    $images = hr_sa_hrdf_get_array('trip.product.images', $trip_id);
+    $images = array_values(array_filter(array_map('hr_sa_jsonld_normalize_url', $images)));
+
+    return $images;
+}
+
+/**
+ * Collect additional properties for the product from HRDF.
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function hr_sa_trip_collect_additional_properties(int $trip_id): array
+{
+    $properties = [];
+    $raw        = hr_sa_hrdf_get_array('trip.product.additional_properties', $trip_id);
+
+    foreach ($raw as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+
+        $name  = isset($row['name']) ? trim((string) $row['name']) : '';
+        $value = isset($row['value']) ? hr_sa_jsonld_clean_text($row['value']) : '';
+
+        if ($name === '' || $value === '') {
+            continue;
+        }
+
+        $property = [
+            '@type' => 'PropertyValue',
+            'name'  => $name,
+            'value' => $value,
+        ];
+
+        if (!empty($row['unitCode']) && is_string($row['unitCode'])) {
+            $property['unitCode'] = strtoupper(trim($row['unitCode']));
+        }
+
+        if (!empty($row['valueReference']) && is_array($row['valueReference'])) {
+            $property['valueReference'] = $row['valueReference'];
+        }
+
+        $properties[] = $property;
+    }
+
+    return $properties;
+}
+
+/**
+ * Collect offer nodes from HRDF.
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function hr_sa_trip_collect_offers(int $trip_id, string $product_url): array
+{
+    $offers     = [];
+    $raw_offers = hr_sa_hrdf_get_array('trip.offers', $trip_id);
+    $default    = $product_url !== '' ? trailingslashit($product_url) . '#offer' : '';
+
+    foreach ($raw_offers as $raw) {
+        if (!is_array($raw)) {
+            continue;
+        }
+
+        $offer = hr_sa_jsonld_prepare_offer($raw, $default);
+        if ($offer !== null) {
+            $offers[] = $offer;
+        }
+    }
+
+    return $offers;
+}
+
+/**
+ * Build an AggregateOffer wrapper for product offers.
+ */
+function hr_sa_trip_build_aggregate_offer(array $offers, int $trip_id): ?array
+{
+    if (!$offers) {
+        return null;
+    }
+
+    $aggregate = [
+        '@type'  => 'AggregateOffer',
+        'offers' => $offers,
+    ];
+
+    $currency = hr_sa_hrdf_get('trip.aggregate_offer.currency', $trip_id);
+    $currencies = array_values(array_unique(array_filter(array_map(
+        static fn($offer) => $offer['priceCurrency'] ?? '',
+        $offers
+    ))));
+
+    if (!is_string($currency) || $currency === '') {
+        if (count($currencies) === 1) {
+            $currency = $currencies[0];
+        } else {
+            $currency = '';
+        }
+    }
+
+    if ($currency !== '') {
+        $aggregate['priceCurrency'] = $currency;
+    }
+
+    $prices = array_values(array_filter(array_map(
+        static fn($offer) => isset($offer['price']) && is_numeric($offer['price']) ? (float) $offer['price'] : null,
+        $offers
+    )));
+
+    if ($prices) {
+        $aggregate['lowPrice']   = number_format((float) min($prices), 2, '.', '');
+        $aggregate['highPrice']  = number_format((float) max($prices), 2, '.', '');
+        $aggregate['offerCount'] = count($offers);
+    } else {
+        $aggregate['offerCount'] = count($offers);
+    }
+
+    $aggregate = hr_sa_jsonld_array_filter($aggregate);
+
+    return $aggregate ?: null;
+}
+
+/**
+ * Collect about references for the Product node.
+ *
+ * @return array<int, array<string, string>>
+ */
+function hr_sa_trip_collect_about_references(int $trip_id): array
+{
+    $about = [];
+    $raw   = hr_sa_hrdf_get_array('trip.product.about', $trip_id);
+
+    foreach ($raw as $item) {
+        if (is_array($item)) {
+            $candidate = hr_sa_jsonld_array_filter($item);
+            if ($candidate) {
+                $about[] = $candidate;
+            }
+            continue;
+        }
+
+        $url = hr_sa_jsonld_normalize_url($item);
+        if ($url !== '') {
+            $about[] = ['@id' => $url];
+        }
+    }
+
+    return $about;
+}
+
+/**
+ * Collect hasPart references for the Product node.
+ *
+ * @return array<int, array<string, string>>
+ */
+function hr_sa_trip_collect_has_part_references(int $trip_id): array
+{
+    $has_part = [];
+    $raw      = hr_sa_hrdf_get_array('trip.product.has_part', $trip_id);
+
+    foreach ($raw as $item) {
+        if (is_array($item)) {
+            $candidate = hr_sa_jsonld_array_filter($item);
+            if ($candidate) {
+                $has_part[] = $candidate;
+            }
+            continue;
+        }
+
+        $url = hr_sa_jsonld_normalize_url($item);
+        if ($url !== '') {
+            $has_part[] = ['@id' => $url];
+        }
+    }
+
+    return $has_part;
+}
+
+/**
+ * Build Review nodes (and optional AggregateRating) from HRDF reviews.
  *
  * @return array{0: array<int, array<string, mixed>>, 1: array<string, mixed>|null}
  */
-function hr_sa_trip_testimonials_nodes(int $trip_id, string $product_id, array $country_term_ids): array
+function hr_sa_trip_testimonials_nodes(int $trip_id, string $product_id): array
 {
-    $posts = get_posts([
-        'post_type'      => 'testimonial',
-        'posts_per_page' => 20,
-        'tax_query'      => [
-            [
-                'taxonomy' => 'country',
-                'field'    => 'term_id',
-                'terms'    => $country_term_ids,
-            ],
-        ],
-        'post_status'    => 'publish',
-        'orderby'        => 'date',
-        'order'          => 'DESC',
-    ]);
+    $reviews     = [];
+    $raw_reviews = hr_sa_hrdf_get_array('trip.reviews.items', $trip_id);
 
-    if (!$posts) {
-        return [[], null];
-    }
-
-    $reviews = [];
-    $ratings = [];
-
-    foreach ($posts as $testimonial) {
-        $url       = get_permalink($testimonial->ID);
-        $review_id = $url ?: (get_permalink($trip_id) . '#review-' . $testimonial->ID);
-
-        $author = get_post_meta($testimonial->ID, 'author_name', true);
-        if ($author === '') {
-            $author = get_the_author_meta('display_name', $testimonial->post_author) ?: 'Verified Guest';
+    foreach ($raw_reviews as $index => $item) {
+        if (!is_array($item)) {
+            continue;
         }
 
-        $rating = get_post_meta($testimonial->ID, 'rating', true);
-        $date   = get_post_meta($testimonial->ID, 'review_date', true);
-        if ($date === '') {
-            $date = get_the_date('Y-m-d', $testimonial->ID);
+        $review_id = hr_sa_jsonld_normalize_url($item['id'] ?? ($item['url'] ?? ''));
+        if ($review_id === '') {
+            $slug = isset($item['slug']) ? sanitize_title((string) $item['slug']) : 'review-' . ($index + 1);
+            $review_id = trailingslashit($product_id) . $slug;
         }
 
-        $body = hr_sa_trip_clean_text(strip_shortcodes($testimonial->post_content), 120);
-        if ($body === '') {
-            $body = get_the_title($testimonial->ID);
-        }
-
-        $node = [
-            '@type'         => 'Review',
-            '@id'           => $review_id,
-            'reviewBody'    => $body,
-            'datePublished' => $date,
-            'author'        => [
-                '@type' => 'Person',
-                'name'  => $author,
-            ],
-            'itemReviewed'  => ['@id' => $product_id],
+        $review = [
+            '@type'        => 'Review',
+            '@id'          => $review_id,
+            'itemReviewed' => ['@id' => $product_id],
         ];
 
-        if ($rating !== '' && is_numeric($rating)) {
-            $value = max(0, min(5, (float) $rating));
-            if ($value > 0) {
-                $node['reviewRating'] = [
-                    '@type'       => 'Rating',
-                    'ratingValue' => $value,
-                    'bestRating'  => 5,
-                    'worstRating' => 1,
-                ];
-                $ratings[] = $value;
-            }
+        $body = $item['reviewBody'] ?? $item['body'] ?? '';
+        if (is_string($body) && $body !== '') {
+            $review['reviewBody'] = hr_sa_jsonld_clean_text($body, 120);
         }
 
-        $reviews[] = $node;
+        $date = hr_sa_jsonld_normalize_iso8601($item['datePublished'] ?? $item['date'] ?? '');
+        if ($date !== '') {
+            $review['datePublished'] = $date;
+        }
+
+        $author_name = $item['author']['name'] ?? $item['author_name'] ?? '';
+        if (is_string($author_name) && $author_name !== '') {
+            $review['author'] = [
+                '@type' => isset($item['author']['@type']) && is_string($item['author']['@type'])
+                    ? $item['author']['@type']
+                    : 'Person',
+                'name'  => $author_name,
+            ];
+        }
+
+        $rating_value = $item['reviewRating']['ratingValue'] ?? $item['rating'] ?? null;
+        if ($rating_value !== null && $rating_value !== '' && is_numeric($rating_value)) {
+            $rating = [
+                '@type'       => 'Rating',
+                'ratingValue' => round((float) $rating_value, 2),
+            ];
+
+            $best = $item['reviewRating']['bestRating'] ?? $item['bestRating'] ?? null;
+            if ($best !== null && is_numeric($best)) {
+                $rating['bestRating'] = (float) $best;
+            }
+
+            $worst = $item['reviewRating']['worstRating'] ?? $item['worstRating'] ?? null;
+            if ($worst !== null && is_numeric($worst)) {
+                $rating['worstRating'] = (float) $worst;
+            }
+
+            $review['reviewRating'] = $rating;
+        }
+
+        if (!empty($item['publisher']) && is_array($item['publisher'])) {
+            $review['publisher'] = $item['publisher'];
+        }
+
+        $review = hr_sa_jsonld_array_filter($review);
+        if ($review) {
+            $reviews[] = $review;
+        }
     }
 
     $aggregate = null;
-    if (count($ratings) >= 3) {
-        $average   = array_sum($ratings) / count($ratings);
-        $aggregate = [
+    $raw_aggregate = hr_sa_hrdf_get('trip.reviews.aggregate', $trip_id);
+    if (is_array($raw_aggregate)) {
+        $aggregate = hr_sa_jsonld_array_filter([
             '@type'       => 'AggregateRating',
-            'ratingValue' => round($average, 2),
-            'reviewCount' => count($ratings),
-            'bestRating'  => 5,
-            'worstRating' => 1,
-        ];
+            'ratingValue' => isset($raw_aggregate['ratingValue']) && is_numeric($raw_aggregate['ratingValue'])
+                ? (float) $raw_aggregate['ratingValue']
+                : null,
+            'reviewCount' => isset($raw_aggregate['reviewCount']) && is_numeric($raw_aggregate['reviewCount'])
+                ? (int) $raw_aggregate['reviewCount']
+                : null,
+            'bestRating'  => isset($raw_aggregate['bestRating']) && is_numeric($raw_aggregate['bestRating'])
+                ? (float) $raw_aggregate['bestRating']
+                : null,
+            'worstRating' => isset($raw_aggregate['worstRating']) && is_numeric($raw_aggregate['worstRating'])
+                ? (float) $raw_aggregate['worstRating']
+                : null,
+        ]);
     }
 
     return [$reviews, $aggregate];

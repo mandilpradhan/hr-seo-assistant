@@ -1,6 +1,6 @@
 # HR SEO Assistant
 
-**Version:** 0.3.0
+**Version:** 0.3.1
 **Author:** Himalayan Rides  
 **Description:** HR SEO Assistant unifies Open Graph, Twitter Cards, and JSON-LD schema under one modular framework. Built for portability and clarity, it integrates with the HR Media Help hero system and provides a debug page for validation. Future phases will add AI-assisted SEO enhancements.
 
