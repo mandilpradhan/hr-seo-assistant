@@ -20,7 +20,7 @@ function hr_sa_get_context(): array
 {
     $post_id = is_singular() ? (int) get_queried_object_id() : 0;
     $type    = hr_sa_detect_content_type();
-    $site    = hr_sa_hrdf_site_payload();
+    $site    = hr_sa_hrdf_site_payload($type === 'trip' ? $post_id : null);
 
     $context = [
         'type'           => $type,
@@ -40,7 +40,10 @@ function hr_sa_get_context(): array
     ];
 
     if ($type === 'trip' && $post_id > 0) {
-        $trip = hr_sa_hrdf_trip_payload($post_id);
+        $trip     = hr_sa_hrdf_trip_payload($post_id);
+        $product  = isset($trip['product']) && is_array($trip['product']) ? $trip['product'] : [];
+        $og_data  = isset($trip['og']) && is_array($trip['og']) ? $trip['og'] : [];
+        $twitter  = isset($trip['twitter']) && is_array($trip['twitter']) ? $trip['twitter'] : [];
 
         if (!empty($trip['url'])) {
             $context['url'] = $trip['url'];
@@ -61,7 +64,86 @@ function hr_sa_get_context(): array
             }
         }
 
-        $context['offers'] = is_array($trip['offers']) ? $trip['offers'] : [];
+        if (!empty($trip['offers']) && is_array($trip['offers'])) {
+            $context['offers'] = $trip['offers'];
+        }
+
+        $product_name = hr_sa_hrdf_normalize_text((string) ($product['name'] ?? ''));
+        if ($product_name !== '') {
+            $context['title'] = $product_name;
+        }
+
+        $product_description = hr_sa_hrdf_normalize_text((string) ($product['description'] ?? ''));
+        if ($product_description !== '') {
+            $context['description'] = $product_description;
+        }
+
+        $product_url = hr_sa_hrdf_normalize_url($product['url'] ?? '');
+        if ($product_url !== '') {
+            $context['url'] = $product_url;
+        }
+
+        $product_images = $product['image'] ?? [];
+        if (is_string($product_images)) {
+            $product_images = [$product_images];
+        }
+        if (is_array($product_images) && $product_images) {
+            $primary_product_image = hr_sa_hrdf_normalize_url((string) reset($product_images));
+            if ($primary_product_image !== '') {
+                $context['image']    = $primary_product_image;
+                $context['hero_url'] = $primary_product_image;
+            }
+        }
+
+        $og_title = hr_sa_hrdf_normalize_text((string) ($og_data['title'] ?? ''));
+        if ($og_title !== '') {
+            $context['title'] = $og_title;
+        }
+
+        $og_description = hr_sa_hrdf_normalize_text((string) ($og_data['description'] ?? ''));
+        if ($og_description !== '') {
+            $context['description'] = $og_description;
+        }
+
+        $og_url = hr_sa_hrdf_normalize_url($og_data['url'] ?? '');
+        if ($og_url !== '') {
+            $context['url'] = $og_url;
+        }
+
+        $og_image = $og_data['image'] ?? '';
+        if (is_array($og_image)) {
+            $og_image = reset($og_image) ?: '';
+        }
+        $og_image = hr_sa_hrdf_normalize_url($og_image);
+        if ($og_image !== '') {
+            $context['image']    = $og_image;
+            $context['hero_url'] = $og_image;
+        }
+
+        $og_site_name = hr_sa_hrdf_normalize_text((string) ($og_data['site_name'] ?? ''));
+        if ($og_site_name !== '') {
+            $context['og_site_name'] = $og_site_name;
+        }
+
+        $og_locale = hr_sa_hrdf_normalize_text((string) ($og_data['locale'] ?? ''));
+        if ($og_locale !== '') {
+            $context['locale'] = $og_locale;
+        }
+
+        $twitter_site = hr_sa_hrdf_normalize_text((string) ($twitter['site'] ?? ''));
+        if ($twitter_site !== '') {
+            $context['twitter_site'] = $twitter_site;
+        }
+
+        $twitter_creator = hr_sa_hrdf_normalize_text((string) ($twitter['creator'] ?? ''));
+        if ($twitter_creator !== '') {
+            $context['twitter_creator'] = $twitter_creator;
+        }
+
+        $twitter_handle = hr_sa_hrdf_normalize_text((string) ($twitter['handle'] ?? ''));
+        if ($twitter_handle !== '') {
+            $context['twitter_handle'] = $twitter_handle;
+        }
     }
 
     if ($context['hero_url'] === '') {
