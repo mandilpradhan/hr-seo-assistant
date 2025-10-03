@@ -24,6 +24,7 @@ define('HR_SA_PLUGIN_URL', plugin_dir_url(__FILE__));
 
 require_once HR_SA_PLUGIN_DIR . 'core/settings.php';
 require_once HR_SA_PLUGIN_DIR . 'core/feature-flags.php';
+require_once HR_SA_PLUGIN_DIR . 'core/hrdf.php';
 require_once HR_SA_PLUGIN_DIR . 'core/context.php';
 require_once HR_SA_PLUGIN_DIR . 'core/ai.php';
 require_once HR_SA_PLUGIN_DIR . 'core/compat.php';
