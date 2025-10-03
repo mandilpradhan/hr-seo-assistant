@@ -128,6 +128,11 @@ Rename MU files back to `*.php` so production behavior is unchanged until we shi
 2. Trigger a preview for any page and focus on the **Type** column.
 3. Confirm that entries whose context or type equals `https://schema.org/` now display as **Schema.org** (humanized host) instead of showing a blank label.
 
+## Preview Smoke Tests — HRDF Data
+1. Open **HR SEO → JSON-LD Preview** and load a published Trip. Confirm the preview includes Organization, Product, Itinerary, FAQ, Vehicles, and Review rows populated solely from HRDF values.
+2. In **HR SEO → Open Graph Preview**, load the same Trip. Verify the card shows title, description, URL, image, price, and availability drawn from HRDF (no WordPress fallbacks).
+3. Switch the Open Graph preview to a non-Trip item. Ensure fields only surface when HRDF provides data (blank values remain empty).
+
 ✅ **Phase 0 is complete** when:
 - JSON-LD parity is verified on the three page types.
 - Admin UI & Debug behave correctly.

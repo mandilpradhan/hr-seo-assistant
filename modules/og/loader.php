@@ -196,12 +196,19 @@ function hr_sa_get_social_tag_snapshot(): array
 function hr_sa_collect_social_tag_data(): array
 {
     $context = hr_sa_get_context();
+    $post_id = is_singular() ? (int) get_queried_object_id() : 0;
 
     $blocked         = hr_sa_should_respect_other_seo() && hr_sa_other_seo_active();
     $og_enabled      = !$blocked && hr_sa_is_og_enabled();
     $twitter_enabled = !$blocked && hr_sa_is_twitter_enabled();
 
-    $og_tags      = $og_enabled ? hr_sa_prepare_og_tags($context) : [];
+    $offers = [];
+    if ($post_id > 0 && ($context['type'] ?? '') === 'trip') {
+        $trip_payload = hr_sa_hrdf_trip_payload($post_id);
+        $offers       = is_array($trip_payload['offers']) ? $trip_payload['offers'] : [];
+    }
+
+    $og_tags      = $og_enabled ? hr_sa_prepare_og_tags($context, $offers) : [];
     $twitter_tags = $twitter_enabled ? hr_sa_prepare_twitter_tags($context) : [];
 
     $fields = [
@@ -210,8 +217,11 @@ function hr_sa_collect_social_tag_data(): array
         'url'            => (string) ($context['url'] ?? ''),
         'image'          => (string) ($context['image'] ?? ($context['hero_url'] ?? '')),
         'site_name'      => (string) ($context['site_name'] ?? ''),
+        'og_site_name'   => (string) ($context['og_site_name'] ?? ''),
         'locale'         => (string) ($context['locale'] ?? ''),
         'twitter_handle' => (string) ($context['twitter_handle'] ?? ''),
+        'twitter_site'   => (string) ($context['twitter_site'] ?? ''),
+        'twitter_creator'=> (string) ($context['twitter_creator'] ?? ''),
     ];
 
     $snapshot = [
@@ -237,21 +247,18 @@ function hr_sa_collect_social_tag_data(): array
  *
  * @param array<string, mixed> $context
  *
+ * @param array<int, mixed> $offers
  * @return array<string, string>
  */
-function hr_sa_prepare_og_tags(array $context): array
+function hr_sa_prepare_og_tags(array $context, array $offers = []): array
 {
     $title       = trim((string) ($context['title'] ?? ''));
     $description = trim((string) ($context['description'] ?? ''));
     $url         = trim((string) ($context['url'] ?? ''));
     $image       = trim((string) ($context['image'] ?? ($context['hero_url'] ?? '')));
-    $site_name   = trim((string) ($context['site_name'] ?? ''));
+    $site_name   = trim((string) ($context['og_site_name'] ?? ($context['site_name'] ?? '')));
     $locale      = trim((string) ($context['locale'] ?? ''));
     $type        = hr_sa_map_og_type((string) ($context['type'] ?? ''));
-
-    if ($locale === '') {
-        $locale = get_locale();
-    }
 
     $tags = [
         'og:title'       => $title,
@@ -260,11 +267,25 @@ function hr_sa_prepare_og_tags(array $context): array
         'og:url'         => $url,
         'og:image'       => $image,
         'og:site_name'   => $site_name,
-        'og:locale'      => $locale,
     ];
 
+    if ($locale !== '') {
+        $tags['og:locale'] = $locale;
+    }
+
+    if ($type === 'product') {
+        $offer = hr_sa_og_select_offer($offers);
+        if ($offer) {
+            $tags['product:price:amount']   = $offer['amount'];
+            $tags['product:price:currency'] = $offer['currency'];
+            if ($offer['availability'] !== '') {
+                $tags['product:availability'] = $offer['availability'];
+            }
+        }
+    }
+
     $tags = array_filter($tags, static fn($value): bool => is_string($value) && $value !== '');
-    $ordered_keys = ['og:title', 'og:description', 'og:type', 'og:url', 'og:image', 'og:site_name', 'og:locale'];
+    $ordered_keys = ['og:title', 'og:description', 'og:type', 'og:url', 'og:image', 'og:site_name', 'og:locale', 'product:price:amount', 'product:price:currency', 'product:availability'];
     $ordered = [];
     foreach ($ordered_keys as $key) {
         if (isset($tags[$key])) {
@@ -298,7 +319,8 @@ function hr_sa_prepare_twitter_tags(array $context): array
     $title       = trim((string) ($context['title'] ?? ''));
     $description = trim((string) ($context['description'] ?? ''));
     $image       = trim((string) ($context['image'] ?? ($context['hero_url'] ?? '')));
-    $handle      = trim((string) ($context['twitter_handle'] ?? ''));
+    $handle      = trim((string) ($context['twitter_site'] ?? ($context['twitter_handle'] ?? '')));
+    $creator     = trim((string) ($context['twitter_creator'] ?? ''));
 
     $tags = [
         'twitter:card'        => 'summary_large_image',
@@ -311,8 +333,15 @@ function hr_sa_prepare_twitter_tags(array $context): array
         $tags['twitter:site'] = $handle;
     }
 
+    if ($creator !== '') {
+        $tags['twitter:creator'] = $creator;
+    }
+
     $tags = array_filter($tags, static fn($value): bool => is_string($value) && $value !== '');
     $ordered_keys = ['twitter:card', 'twitter:title', 'twitter:description', 'twitter:image', 'twitter:site'];
+    if ($creator !== '') {
+        $ordered_keys[] = 'twitter:creator';
+    }
     $ordered = [];
     foreach ($ordered_keys as $key) {
         if (isset($tags[$key])) {
@@ -353,6 +382,53 @@ function hr_sa_map_og_type(string $content_type): string
         default:
             return 'article';
     }
+}
+
+/**
+ * Select the first offer for Open Graph price metadata.
+ *
+ * @param array<int, mixed> $offers
+ * @return array{amount: string, currency: string, availability: string}|null
+ */
+function hr_sa_og_select_offer(array $offers): ?array
+{
+    foreach ($offers as $offer) {
+        if (!is_array($offer) || !isset($offer['price']) || !is_array($offer['price'])) {
+            continue;
+        }
+
+        $amount   = $offer['price']['amount'] ?? null;
+        $currency = isset($offer['price']['currency']) ? strtoupper(hr_sa_hrdf_normalize_text($offer['price']['currency'])) : '';
+
+        if (!is_numeric($amount) || $currency === '') {
+            continue;
+        }
+
+        $availability = isset($offer['availability']) ? hr_sa_og_map_availability((string) $offer['availability']) : '';
+
+        return [
+            'amount'       => hr_sa_hrdf_format_price((float) $amount),
+            'currency'     => $currency,
+            'availability' => $availability,
+        ];
+    }
+
+    return null;
+}
+
+/**
+ * Map schema availability URLs to Open Graph tokens.
+ */
+function hr_sa_og_map_availability(string $value): string
+{
+    $value = trim($value);
+
+    return match ($value) {
+        'https://schema.org/InStock'             => 'instock',
+        'https://schema.org/SoldOut'             => 'oos',
+        'https://schema.org/LimitedAvailability' => 'limited availability',
+        default                                  => '',
+    };
 }
 
 /**
