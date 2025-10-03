@@ -42,6 +42,32 @@ We follow **semantic versioning**:
 - Debug mode can be enabled in settings to access the debug surface.
 - All metadata is emitted early in `<head>` with no duplicates.
 
+### HRDF Mapping
+
+| SEO Field | HRDF Key |
+|-----------|----------|
+| Organization Name / Site Name | `site.name` |
+| Organization URL | `site.url` |
+| Organization Logo | `site.logo_url` |
+| Organization Legal Name | `site.org.legal_name` |
+| Organization Address | `site.org.address.{street,locality,region,postal,country}` |
+| Organization SameAs Profiles | `site.org.same_as` |
+| Organization Contact Points | `site.org.contact_points` |
+| Open Graph Site Name | `site.og.site_name` |
+| Locale | `site.locale` |
+| Twitter Site / Handle / Creator | `site.twitter.site`, `site.twitter.handle`, `site.twitter.creator` |
+| Trip URL | `trip.url` |
+| Trip Title | `trip.title` |
+| Trip Description | `trip.description` |
+| Trip Images | `trip.images` |
+| Trip Additional Property Values | `trip.additional_property` |
+| Trip Itinerary Steps | `trip.itinerary.steps` |
+| Trip FAQ Entries | `trip.faq` |
+| Trip Vehicles | `trip.vehicles` |
+| Trip Reviews | `trip.reviews` |
+| Trip Aggregate Rating | `trip.aggregateRating` |
+| Trip Offers | `trip.offers` |
+
 ---
 
 ## Roadmap
