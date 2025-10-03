@@ -12,93 +12,55 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Build an ItemList node representing the itinerary.
- *
- * @param int    $trip_id
- * @param string $product_id
- * @param array<int> $country_term_ids
+ * Build an ItemList node representing the itinerary using HRDF data.
  *
  * @return array{0: array<string, mixed>|null, 1: array<string, string>|null}
  */
-function hr_sa_trip_itinerary_node(int $trip_id, string $product_id, array $country_term_ids): array
+function hr_sa_trip_itinerary_node(int $trip_id, string $product_id): array
 {
-    $posts = get_posts([
-        'post_type'      => 'itinerary',
-        'posts_per_page' => -1,
-        'tax_query'      => [
-            [
-                'taxonomy' => 'country',
-                'field'    => 'term_id',
-                'terms'    => $country_term_ids,
-            ],
-        ],
-        'post_status'    => 'publish',
-        'orderby'        => 'menu_order',
-        'order'          => 'ASC',
-    ]);
+    $itinerary = hr_sa_hrdf_get('trip.itinerary', $trip_id);
+    $raw_steps = [];
 
-    if (!$posts) {
-        return [null, null];
+    if (is_array($itinerary) && isset($itinerary['steps']) && is_array($itinerary['steps'])) {
+        $raw_steps = $itinerary['steps'];
+    } else {
+        $raw_steps = hr_sa_hrdf_get_array('trip.itinerary.steps', $trip_id);
     }
 
     $elements = [];
     $position = 1;
 
-    foreach ($posts as $itinerary) {
-        $title = hr_sa_trip_clean_text(get_the_title($itinerary->ID));
-        if ($title === '') {
+    foreach ($raw_steps as $step) {
+        if (!is_array($step)) {
             continue;
         }
 
-        $summary = '';
-        $labels  = [];
-
-        $steps = function_exists('get_field') ? get_field('itinerary_steps', $itinerary->ID) : get_post_meta($itinerary->ID, 'itinerary_steps', true);
-        if (is_array($steps) && $steps) {
-            foreach ($steps as $row) {
-                $name = '';
-                if (is_array($row)) {
-                    $name = $row['title'] ?? ($row['name'] ?? '');
-                } else {
-                    $name = (string) $row;
-                }
-
-                $name = hr_sa_trip_clean_text($name);
-                if ($name !== '') {
-                    $labels[] = $name;
-                }
-
-                if (count($labels) >= 8) {
-                    break;
-                }
-            }
-            $summary = implode('; ', $labels);
-        } else {
-            $content = apply_filters('the_content', $itinerary->post_content);
-            if ($content && preg_match_all('/<(h2|h3)[^>]*>(.*?)<\/\\1>/i', $content, $matches)) {
-                foreach ($matches[2] as $heading) {
-                    $heading = hr_sa_trip_clean_text($heading);
-                    if ($heading) {
-                        $labels[] = $heading;
-                    }
-                    if (count($labels) >= 8) {
-                        break;
-                    }
-                }
-                $summary = implode('; ', $labels);
-            } else {
-                $summary = hr_sa_trip_clean_text($itinerary->post_content, 50);
-            }
+        $name = isset($step['name']) ? hr_sa_jsonld_clean_text($step['name']) : '';
+        if ($name === '') {
+            continue;
         }
 
         $item = [
             '@type'    => 'ListItem',
             'position' => $position++,
-            'name'     => $title,
+            'name'     => $name,
         ];
 
-        if ($summary !== '') {
-            $item['description'] = $summary;
+        if (!empty($step['description'])) {
+            $description = hr_sa_jsonld_clean_text($step['description'], 80);
+            if ($description !== '') {
+                $item['description'] = $description;
+            }
+        }
+
+        $start = hr_sa_jsonld_normalize_iso8601($step['startDate'] ?? '');
+        if ($start !== '') {
+            $item['startDate'] = $start;
+        }
+
+        $end = hr_sa_jsonld_normalize_iso8601($step['endDate'] ?? '');
+        if ($end !== '') {
+            $item['endDate'] = $end;
         }
 
         $elements[] = $item;
@@ -108,14 +70,35 @@ function hr_sa_trip_itinerary_node(int $trip_id, string $product_id, array $coun
         return [null, null];
     }
 
-    $trip_url     = get_permalink($trip_id);
-    $itinerary_id = $trip_url ? ($trip_url . '#itinerary') : ($product_id . '-itinerary');
-    $node         = [
+    $itinerary_url = hr_sa_jsonld_normalize_url(is_array($itinerary) ? ($itinerary['url'] ?? '') : '');
+    if ($itinerary_url === '') {
+        $fallback_url = hr_sa_hrdf_get('trip.itinerary.url', $trip_id);
+        $itinerary_url = hr_sa_jsonld_normalize_url($fallback_url);
+    }
+
+    if ($itinerary_url === '') {
+        $itinerary_url = trailingslashit($product_id) . 'itinerary';
+    }
+
+    $name = 'Itinerary';
+    if (is_array($itinerary) && !empty($itinerary['name']) && is_string($itinerary['name'])) {
+        $name = $itinerary['name'];
+    }
+
+    $node = [
         '@type'           => 'ItemList',
-        '@id'             => $itinerary_id,
-        'name'            => 'Itinerary',
+        '@id'             => $itinerary_url,
+        'name'            => $name,
         'itemListElement' => $elements,
     ];
 
-    return [$node, ['@id' => $itinerary_id]];
+    if (is_array($itinerary) && !empty($itinerary['description']) && is_string($itinerary['description'])) {
+        $node['description'] = hr_sa_jsonld_clean_text($itinerary['description'], 80);
+    }
+
+    if (is_array($itinerary) && !empty($itinerary['itemListOrder']) && is_string($itinerary['itemListOrder'])) {
+        $node['itemListOrder'] = $itinerary['itemListOrder'];
+    }
+
+    return [$node, ['@id' => $itinerary_url]];
 }

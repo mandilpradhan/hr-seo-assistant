@@ -12,7 +12,7 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Build FAQPage nodes for a Trip by matching FAQ CPT via shared country terms.
+ * Build FAQPage nodes for a Trip using HRDF data.
  *
  * @return array<int, array<string, mixed>>
  */
@@ -22,80 +22,64 @@ function hr_sa_trip_faq_nodes(int $trip_id): array
         return [];
     }
 
-    $cache_key = sprintf('hr_sa_faq_nodes_trip_%d', $trip_id);
-    $cached    = get_transient($cache_key);
-    if (is_array($cached)) {
-        return $cached;
-    }
-
-    $terms = get_the_terms($trip_id, 'country');
-    if (empty($terms) || is_wp_error($terms)) {
-        set_transient($cache_key, [], 12 * HOUR_IN_SECONDS);
+    $items = hr_sa_hrdf_get_array('trip.faq', $trip_id);
+    if (!$items) {
         return [];
     }
 
-    $country_ids = array_map(static fn($term) => (int) $term->term_id, $terms);
-
-    $query = new WP_Query([
-        'post_type'           => 'faq',
-        'post_status'         => 'publish',
-        'posts_per_page'      => 50,
-        'no_found_rows'       => true,
-        'ignore_sticky_posts' => true,
-        'fields'              => 'ids',
-        'tax_query'           => [
-            [
-                'taxonomy'         => 'country',
-                'field'            => 'term_id',
-                'terms'            => $country_ids,
-                'operator'         => 'IN',
-                'include_children' => false,
-            ],
-        ],
-    ]);
-
-    if (empty($query->posts)) {
-        set_transient($cache_key, [], 12 * HOUR_IN_SECONDS);
-        return [];
-    }
-
-    $qas = [];
-    foreach ($query->posts as $faq_id) {
-        $title = get_the_title($faq_id);
-        if (trim((string) $title) === '') {
+    $questions = [];
+    foreach ($items as $entry) {
+        if (!is_array($entry)) {
             continue;
         }
 
-        $raw = (string) get_post_field('post_content', $faq_id);
-        $clean = hr_sa_jsonld_sanitize_answer_html($raw);
-        if ($clean === '') {
+        $question = $entry['question'] ?? ($entry['q'] ?? '');
+        $answer   = $entry['answer'] ?? ($entry['a'] ?? '');
+
+        if (!is_string($question) || trim($question) === '') {
             continue;
         }
 
-        $qas[] = [
-            '@type' => 'Question',
-            'name'  => $title,
+        if (!is_string($answer) || trim($answer) === '') {
+            continue;
+        }
+
+        $clean_answer = hr_sa_jsonld_sanitize_answer_html($answer);
+        if ($clean_answer === '') {
+            continue;
+        }
+
+        $questions[] = [
+            '@type'          => 'Question',
+            'name'           => trim($question),
             'acceptedAnswer' => [
                 '@type' => 'Answer',
-                'text'  => $clean,
+                'text'  => $clean_answer,
             ],
         ];
     }
 
-    if (!$qas) {
-        set_transient($cache_key, [], 12 * HOUR_IN_SECONDS);
+    if (!$questions) {
         return [];
     }
 
-    $trip_url = set_url_scheme((string) get_permalink($trip_id), 'https');
-    $node     = [
+    $faq_url = hr_sa_jsonld_normalize_url(hr_sa_hrdf_get('trip.faq.url', $trip_id));
+    if ($faq_url === '') {
+        $faq_url = hr_sa_jsonld_normalize_url(hr_sa_hrdf_get('webpage.url', $trip_id));
+    }
+    if ($faq_url === '') {
+        $faq_url = hr_sa_jsonld_normalize_url(hr_sa_hrdf_get('trip.product.url', $trip_id));
+    }
+
+    if ($faq_url === '') {
+        return [];
+    }
+
+    $node = [
         '@type'      => 'FAQPage',
-        '@id'        => trailingslashit($trip_url) . '#faqs',
-        'mainEntity' => array_values($qas),
+        '@id'        => trailingslashit($faq_url) . '#faqs',
+        'mainEntity' => array_values($questions),
     ];
 
-    $result = [$node];
-    set_transient($cache_key, $result, 12 * HOUR_IN_SECONDS);
-
-    return $result;
+    return [$node];
 }
